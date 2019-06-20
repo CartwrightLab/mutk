@@ -1,0 +1,138 @@
+#!/bin/sh
+#
+# Copyright (c) 2019 Reed A. Cartwright <reed@cartwright.ht>
+# 
+# This file is part of the Ultimate Source Code Project.
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# version info
+version_num="@CMAKE_PROJECT_VERSION@"
+commit_num="-@COMMIT_ID@"
+
+command_prefix="mutk"
+project_name="MUTK"
+
+# set default libexec location
+# under certain conditions this may fail to work, so an installer should set
+# this to the proper installation directory, e.g. $prefix/libexec
+
+# CMD_LIBEXEC_DIR="@PREFIX@/libexec" #Uncomment and change as needed
+: ${CMD_LIBEXEC_DIR:="$( cd "$( dirname "$0" )" && pwd )"/../@CMAKE_INSTALL_LIBEXECDIR@}
+
+# Internal commands
+int_cmds="help version"
+
+submatch () { case "$2" in *$1*) return 0 ;; *) return 1 ;; esac ; }
+
+check_libexec() {
+	if [ ! -d $CMD_LIBEXEC_DIR ]; then
+        echo "ERROR: CMD_LIBEXEC_DIR ($CMD_LIBEXEC_DIR) does not exist."
+        echo "Solution: Try setting it in your environment."
+        exit 1
+	fi
+}
+
+# calls external command
+execute_command_ex() {
+    check_libexec
+    cmd=$1
+    shift
+    cmdpath="${CMD_LIBEXEC_DIR}/${command_prefix}-${cmd}"
+    if [ ! -x $cmdpath  ]; then
+        echo "ERROR: command '${cmd}' not recognized"
+        return 1
+    fi
+    exec $cmdpath "$@"
+    return $?
+}
+
+# calls commands
+execute_command() {
+    cmd=$1
+	# check if the command is internal
+	# other wise run external command
+    if submatch "$cmd" "$int_cmds"; then
+        internal_$cmd "$@"
+    else
+        execute_command_ex "$@"
+    fi
+    return $?
+}
+
+internal_version() {
+    if [ "$2" = "--help" ]; then
+        echo "USAGE: ${command_prefix} version"
+        echo ""
+        echo "Description: Displays version number and commit id."
+        echo ""
+        return 0
+    fi
+
+    echo "${project_name} v${version_num}${commit_num}"
+    return 0
+}
+
+internal_help() {
+    check_libexec
+
+    if [ -n "$2" ]; then
+        if [ "$2" = "--help" ]; then
+	        echo "USAGE: ${command_prefix} help"
+	        echo "       ${command_prefix} help [command]"
+	        echo ""
+	        echo "Description: Displays help information."
+	        echo "    The first form displays a list of available commands."
+	        echo "    The second form displays the help information for a command."
+            echo ""
+	    else
+	        call_command $2 "--help"
+	    fi
+	    return $?
+    fi
+
+    ext_cmds=`find $CMD_LIBEXEC_DIR -maxdepth 1 -type f -perm /111 -name "${command_prefix}-*" -print | sed -e 's/.*${command_prefix}-//'`
+    cmds="$int_cmds $ext_cmds"
+    sorted=`echo $cmds | tr ' ' '\n' | sort | tr '\n' ' '`
+
+    echo "The following commands are supported by this installation of ${project_name}:"
+
+    for i in $sorted; do
+        echo "    $i"
+    done
+    echo "For more information use '${command_prefix} help [command]'"
+    return 0
+}
+
+internal_usage() {
+    echo "USAGE: ${command_prefix} command [options]"
+    echo "       ${command_prefix} help"
+    echo "       ${command_prefix} help [command]"
+}
+
+# print usage if no arguments were given
+if [ "$#" -eq 0 ]; then
+# print help message
+    internal_usage
+    exit 0
+fi
+
+execute_command "$@"
+
+exit $?
