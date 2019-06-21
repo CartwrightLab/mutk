@@ -1,9 +1,11 @@
+set(version_name "version.h")
 set(version_src_file "${the_source_dir}/src/version.h.in")
 set(version_dest_file "${the_binary_dir}/src/version.h")
 
 set(the_version_major "${CMAKE_PROJECT_VERSION_MAJOR}")
 set(the_version_minor "${CMAKE_PROJECT_VERSION_MINOR}")
 set(the_version_patch "${CMAKE_PROJECT_VERSION_PATCH}")
+set(the_version_tweak "${CMAKE_PROJECT_VERSION_TWEAK}") # not used
 
 # Are we are in master/ a prerelease?
 if("${the_version_patch}" STREQUAL "")
@@ -12,7 +14,7 @@ else()
   set(the_version_str "${the_version_major}.${the_version_minor}.${the_version_patch}")
 endif()
 
-message(STATUS "version: ${the_version_str}")
+message(STATUS "Version: ${the_version_str}")
 
 # Process Git Hash information
 set(THE_SOURCE_BUILT_FROM_GIT)
@@ -56,6 +58,7 @@ if (IS_DIRECTORY \"${the_source_dir}/.git\")
   if(git_return)
     set(the_version_git_dirty \"dirty\")
   endif()
+
   message(STATUS \"version: \${the_version_str}\")
   message(STATUS \"git hash: \${the_version_git_hash}\")
   message(STATUS \"git short hash: \${the_version_git_hash_short}\")
@@ -75,7 +78,10 @@ file(WRITE "${configure_script}"
 )
 
 set(configure_vars 
-  the_version_major the_version_minor the_version_patch
+  the_version_major
+  the_version_minor
+  the_version_patch
+  the_version_tweak
   the_version_str
   the_version_git_hash
   the_version_git_hash_short
@@ -90,6 +96,10 @@ endforeach()
 file(APPEND "${configure_script}" "${configure_code}")
 
 file(APPEND "${configure_script}" "
+string(JOIN - the_version_str_long \"\${the_version_str}\" \"g\${the_version_git_hash_short}\" \"\${the_version_git_dirty}\")
+")
+
+file(APPEND "${configure_script}" "
 configure_file(
   \"${version_src_file}\"
   \"${configure_script}.output\"
@@ -100,3 +110,28 @@ configure_file(
   \"${configure_script}.output\"
   \"${version_dest_file}\"
   COPYONLY)\n")
+
+set(clean_files
+  "${version_dest_file}"
+  "${configure_script}.output"
+  "${configure_script}")
+
+set_directory_properties(PROPERTIES
+      ADDITIONAL_MAKE_CLEAN_FILES "${clean_files}")
+
+add_custom_command(
+  OUTPUT  "${version_dest_file}"
+          "${version_dest_file}.noexist"
+  COMMAND "${CMAKE_COMMAND}"
+          -P "${configure_script}"
+  MAIN_DEPENDENCY
+          "${version_src_file}"
+  DEPENDS "${version_src_file}"
+          "${configure_script}"
+  WORKING_DIRECTORY
+          "${CMAKE_CURRENT_BINARY_DIR}"
+  COMMENT "Configuring ${version_name} file \"${version_src_file}\" -> \"${version_dest_file}\"")
+
+add_custom_target(configure-${version_name}
+  DEPENDS "${version_dest_file}"
+  SOURCES "${version_src_file}")
