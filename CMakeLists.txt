@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.2.0 FATAL_ERROR)
 cmake_policy(SET CMP0025 NEW)
 cmake_policy(SET CMP0048 NEW)
 
@@ -64,8 +64,6 @@ if(GIT_FOUND)
     set(the_source_is_in_git ON)
   endif()
 endif()
-
-include("${the_source_dir}/conf/version.cmake")
 
 ## Guard against bad build-type strings
 if(CMAKE_BUILD_TYPE)

@@ -28,6 +28,8 @@ add_subdirectory(lib)
 
 include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
 
+include("${the_source_dir}/conf/version.cmake")
+
 add_executable(mutk-version mutk-version.cc)
 add_dependencies(mutk-version configure-version.h)
 

@@ -29,6 +29,5 @@
 
 int main(int argc, char *argv[]) {
 	std::cerr << "MUTK v" MUTK_VERSION_STR_LONG << std::endl;
-
 	return EXIT_SUCCESS;
 }
