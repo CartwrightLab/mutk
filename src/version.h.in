@@ -1,5 +1,6 @@
 #ifndef MUTK_VERSION_H_FILE
 
+#define MUTK_VERSION_NUM  @the_version_num@
 #define MUTK_VERSION_STR  "@the_version_str@"
 #define MUTK_VERSION_STR_LONG  "@the_version_str_long@"
 #define MUTK_VERSION_MAJOR @the_version_major@
@@ -12,6 +13,7 @@
 #endif
 
 #if 0
+set(MUTK_VERSION_NUM @the_version_num@)
 set(MUTK_VERSION_STR  "@the_version_str@")
 set(MUTK_VERSION_STR_LONG  "@the_version_str_long@")
 set(MUTK_VERSION_MAJOR @the_version_major@)

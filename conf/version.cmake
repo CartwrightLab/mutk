@@ -10,9 +10,15 @@ set(the_version_tweak "${CMAKE_PROJECT_VERSION_TWEAK}") # not used
 # Are we are in master/ a prerelease?
 if("${the_version_patch}" STREQUAL "")
   set(the_version_str "${the_version_major}.${the_version_minor}-prerelease")
+  set(the_version_release 0)
 else()
   set(the_version_str "${the_version_major}.${the_version_minor}.${the_version_patch}")
+  set(the_version_release 1)
 endif()
+
+math(EXPR the_version_num
+  "(${the_version_major})*1000000 + (${the_version_minor})*1000 + (${the_version_patch}${the_version_release})"
+  OUTPUT_FORMAT DECIMAL)
 
 message(STATUS "Version: ${the_version_str}")
 
@@ -83,6 +89,7 @@ set(configure_vars
   the_version_patch
   the_version_tweak
   the_version_str
+  the_version_num
   the_version_git_hash
   the_version_git_hash_short
   the_version_git_dirty
@@ -96,7 +103,10 @@ endforeach()
 file(APPEND "${configure_script}" "${configure_code}")
 
 file(APPEND "${configure_script}" "
-string(JOIN - the_version_str_long \"\${the_version_str}\" \"g\${the_version_git_hash_short}\" \"\${the_version_git_dirty}\")
+set(the_version_str_long \"\${the_version_str}-g\${the_version_git_hash_short}\")
+if(the_version_git_dirty)
+  string(APPEND the_version_str_long \"-\${the_version_git_dirty}\")
+endif()
 ")
 
 file(APPEND "${configure_script}" "
