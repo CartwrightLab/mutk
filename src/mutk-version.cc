@@ -1,3 +1,4 @@
+/*
 # Copyright (c) 2019 Reed A. Cartwright <reed@cartwright.ht>
 # 
 # This file is part of the Ultimate Source Code Project.
@@ -19,21 +20,15 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+*/
 
-include(CheckIncludeFile)
-include(CheckFunctionExists)
-include(CheckLibraryExists)
+#include <cstdlib>
+#include <iostream>
 
-add_subdirectory(lib)
+#include "version.h"
 
-include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
+int main(int argc, char *argv[]) {
+	std::cerr << "MUTK v" MUTK_VERSION_STR_LONG << std::endl;
 
-add_executable(mutk-version mutk-version.cc)
-add_dependencies(mutk-version configure-version.h)
-
-
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/mutk.sh.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh"
-  @ONLY)
-install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
+	return EXIT_SUCCESS;
+}

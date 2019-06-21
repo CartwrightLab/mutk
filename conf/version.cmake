@@ -112,26 +112,18 @@ endif()
 file(APPEND "${configure_script}" "
 configure_file(
   \"${version_src_file}\"
-  \"${configure_script}.output\"
-  @ONLY)\n")
-
-file(APPEND "${configure_script}" "
-configure_file(
-  \"${configure_script}.output\"
   \"${version_dest_file}\"
-  COPYONLY)\n")
+  @ONLY)\n")
 
 set(clean_files
   "${version_dest_file}"
-  "${configure_script}.output"
-  "${configure_script}")
+  )
 
 set_directory_properties(PROPERTIES
       ADDITIONAL_MAKE_CLEAN_FILES "${clean_files}")
 
 add_custom_command(
   OUTPUT  "${version_dest_file}"
-          "${version_dest_file}.noexist"
   COMMAND "${CMAKE_COMMAND}"
           -P "${configure_script}"
   MAIN_DEPENDENCY
