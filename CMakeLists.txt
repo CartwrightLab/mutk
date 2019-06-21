@@ -20,42 +20,55 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1.0 FATAL_ERROR)
-CMAKE_POLICY(SET CMP0025 NEW)
-CMAKE_POLICY(SET CMP0048 NEW)
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+cmake_policy(SET CMP0025 NEW)
+cmake_policy(SET CMP0048 NEW)
+
+set(the_source_dir "${CMAKE_CURRENT_SOURCE_DIR}")
+set(the_binary_dir "${CMAKE_CURRENT_BINARY_DIR}")
 
 ################################################################################
 #  Mutation Toolkit Project Configuration
 # 
 
 ## Important Variables
-SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/modules")
-SET(CMAKE_BUILD_TYPE_INIT "RelWithDebInfo")
-SET_PROPERTY(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
+set(CMAKE_MODULE_PATH "${the_source_dir}/modules")
+set(CMAKE_BUILD_TYPE_INIT "RelWithDebInfo")
+set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 
 ## Compiling options
-SET(USE_STATIC_LIBS OFF CACHE BOOL "Link against static libraries.")
-SET(USE_STATIC_FLAG OFF CACHE BOOL "Use -static flag to create completely static binaries.")
-SET(DEVEL_MODE OFF CACHE BOOL "Enable developer mode.")
+option(USE_STATIC_LIBS "Link against static libraries.")
+option(USE_STATIC_FLAG "Use -static flag to create completely static binaries.")
+option(DEVEL_MODE "Enable developer mode.")
 
 ################################################################################
 # Init Project
 
-PROJECT(MUTK VERSION 0.1.0
+project(MUTK VERSION 0.1
   DESCRIPTION "Mutation Toolkit"
   HOMEPAGE_URL "https://github.com/ultimatesource/mutk/"
   LANGUAGES CXX C)
-SET(CMAKE_CXX_STANDARD 17)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-SET(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
 
 # guard against in-source builds
-if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+if("${the_source_dir}" STREQUAL "${the_binary_dir}")
   message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
 endif()
 
+# Check if we are in a git repository
+find_package(Git)
+if(GIT_FOUND)
+  if(IS_DIRECTORY "${the_source_dir}/.git")
+    set(the_source_is_in_git ON)
+  endif()
+endif()
+
+include("${the_source_dir}/conf/version.cmake")
+
 ## Guard against bad build-type strings
-IF(CMAKE_BUILD_TYPE)
+if(CMAKE_BUILD_TYPE)
   string(TOLOWER "${CMAKE_BUILD_TYPE}" cmake_build_type_tolower)
   if(    NOT cmake_build_type_tolower STREQUAL "debug"
      AND NOT cmake_build_type_tolower STREQUAL "release"
@@ -69,7 +82,7 @@ IF(CMAKE_BUILD_TYPE)
       set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
     endif()
   endif()
-ENDIF()
+endif()
 
 
 ################################################################################
@@ -94,25 +107,7 @@ ENDIF()
 ENABLE_TESTING()
 
 ## Enable Developer CMake Flags
-INCLUDE(devopt)
-
-################################################################################
-# Version Information
-
-## Detect Project Version Information
-FIND_PACKAGE(Git)
-SET(COMMIT_ID "unknown_commit_id")
-IF(GIT_FOUND)
-  EXECUTE_PROCESS(COMMAND ${GIT_EXECUTABLE} describe --always --dirty
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    RESULT_VARIABLE res_var OUTPUT_VARIABLE git_commit_id
-    ERROR_QUIET)
-  IF(${res_var} EQUAL 0 )
-    STRING( REPLACE "\n" "" COMMIT_ID "${git_commit_id}" )
-  ENDIF()
-ENDIF()
-
-MESSAGE(STATUS "${CMAKE_PROJECT_NAME} version: ${CMAKE_PROJECT_VERSION}-${COMMIT_ID}.")
+include("${the_source_dir}/conf/devopt.cmake")
 
 configure_file(mutk.sublime-project mutk.sublime-project COPYONLY)
 
@@ -140,7 +135,7 @@ ADD_SUBDIRECTORY(doc)
 
 ########### Add uninstall target ###############
 CONFIGURE_FILE(
-  "${CMAKE_CURRENT_SOURCE_DIR}/modules/cmake_uninstall.cmake.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/conf/cmake_uninstall.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
   IMMEDIATE @ONLY)
 
