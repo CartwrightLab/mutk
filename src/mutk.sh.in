@@ -22,10 +22,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# version info
-version_num="@CMAKE_PROJECT_VERSION@"
-commit_num="-@COMMIT_ID@"
-
 command_prefix="mutk"
 project_name="MUTK"
 
@@ -37,7 +33,7 @@ project_name="MUTK"
 : ${CMD_LIBEXEC_DIR:="$( cd "$( dirname "$0" )" && pwd )"/../@CMAKE_INSTALL_LIBEXECDIR@}
 
 # Internal commands
-int_cmds="help version"
+int_cmds="help"
 
 submatch () { case "$2" in *$1*) return 0 ;; *) return 1 ;; esac ; }
 
@@ -74,19 +70,6 @@ execute_command() {
         execute_command_ex "$@"
     fi
     return $?
-}
-
-internal_version() {
-    if [ "$2" = "--help" ]; then
-        echo "USAGE: ${command_prefix} version"
-        echo ""
-        echo "Description: Displays version number and commit id."
-        echo ""
-        return 0
-    fi
-
-    echo "${project_name} v${version_num}${commit_num}"
-    return 0
 }
 
 internal_help() {
