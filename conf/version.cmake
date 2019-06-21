@@ -20,8 +20,6 @@ math(EXPR the_version_num
   "(${the_version_major})*1000000 + (${the_version_minor})*1000 + (${the_version_patch}${the_version_release})"
   OUTPUT_FORMAT DECIMAL)
 
-message(STATUS "Version: ${the_version_str}")
-
 # Process Git Hash information
 set(THE_SOURCE_BUILT_FROM_GIT)
 if("$Format:$" STREQUAL "")
@@ -65,10 +63,10 @@ if (IS_DIRECTORY \"${the_source_dir}/.git\")
     set(the_version_git_dirty \"dirty\")
   endif()
 
-  message(STATUS \"version: \${the_version_str}\")
-  message(STATUS \"git hash: \${the_version_git_hash}\")
-  message(STATUS \"git short hash: \${the_version_git_hash_short}\")
-  message(STATUS \"git dirty: \${the_version_git_dirty}\")
+#  message(STATUS \"version: \${the_version_str}\")
+#  message(STATUS \"git hash: \${the_version_git_hash}\")
+#  message(STATUS \"git short hash: \${the_version_git_hash_short}\")
+#  message(STATUS \"git dirty: \${the_version_git_dirty}\")
 endif()
 ")
 else()
@@ -107,6 +105,7 @@ set(the_version_str_long \"\${the_version_str}-g\${the_version_git_hash_short}\"
 if(the_version_git_dirty)
   string(APPEND the_version_str_long \"-\${the_version_git_dirty}\")
 endif()
+message(STATUS \"Project Version: \${the_version_str_long}\")
 ")
 
 file(APPEND "${configure_script}" "
@@ -120,6 +119,8 @@ configure_file(
   \"${version_dest_file}.output\"
   \"${version_dest_file}\"
   COPYONLY)\n")
+
+include("${configure_script}")
 
 set(clean_files
   "${version_dest_file}"
