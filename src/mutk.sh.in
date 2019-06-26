@@ -85,12 +85,12 @@ internal_help() {
 	        echo "    The second form displays the help information for a command."
             echo ""
 	    else
-	        call_command $2 "--help"
+	        execute_command $2 "--help"
 	    fi
 	    return $?
     fi
 
-    ext_cmds=`find $CMD_LIBEXEC_DIR -maxdepth 1 -type f -perm /111 -name "${command_prefix}-*" -print | sed -e 's/.*${command_prefix}-//'`
+    ext_cmds=`find $CMD_LIBEXEC_DIR -maxdepth 1 -type f -perm /111 -name "${command_prefix}-*" -print | sed -e "s/.*${command_prefix}-//"`
     cmds="$int_cmds $ext_cmds"
     sorted=`echo $cmds | tr ' ' '\n' | sort | tr '\n' ' '`
 

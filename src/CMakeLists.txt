@@ -34,6 +34,7 @@ include("${the_source_dir}/conf/version.cmake")
 
 add_executable(mutk-version mutk-version.cc)
 target_link_libraries(mutk-version libmutk)
+install(TARGETS mutk-version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/mutk.sh.in"
@@ -41,4 +42,3 @@ configure_file(
   @ONLY)
 install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
 
-install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk-version" DESTINATION ${CMAKE_INSTALL_BINDIR})
