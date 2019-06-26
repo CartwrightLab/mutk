@@ -113,18 +113,11 @@ message(STATUS \"Project Version+Git: \${the_version_str_long}\")
 file(APPEND "${configure_script}" "
 configure_file(
   \"${version_src_file}\"
-  \"${version_dest_file}.output\"
-  @ONLY)\n")
-
-file(APPEND "${configure_script}" "
-configure_file(
-  \"${version_dest_file}.output\"
   \"${version_dest_file}\"
-  COPYONLY)\n")
+  @ONLY)\n")
 
 set(clean_files
   "${version_dest_file}"
-  "${version_dest_file}.output"
   )
 
 set_directory_properties(PROPERTIES

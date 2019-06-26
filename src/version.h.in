@@ -1,4 +1,5 @@
 #ifndef MUTK_VERSION_H_FILE
+#define MUTK_VERSION_H_FILE
 
 #define MUTK_VERSION_NUM  @the_version_num@
 #define MUTK_VERSION_STR  "@the_version_str@"
@@ -9,8 +10,6 @@
 #define MUTK_VERSION_HASH "@the_version_git_hash@"
 #define MUTK_VERSION_HASH_SHORT "@the_version_git_hash_short@"
 #define MUTK_VERSION_DIRTY "@the_version_git_dirty@"
-
-#endif
 
 #if 0
 set(MUTK_VERSION_NUM @the_version_num@)
@@ -23,3 +22,5 @@ set(MUTK_VERSION_HASH "@the_version_git_hash@")
 set(MUTK_VERSION_HASH_SHORT "@the_version_git_hash_short@")
 set(MUTK_VERSION_DIRTY "@the_version_git_dirty@")
 #endif
+
+#endif // MUTK_VERSION_H_FILE
