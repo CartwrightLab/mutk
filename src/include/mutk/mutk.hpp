@@ -1,3 +1,4 @@
+/*
 # Copyright (c) 2019 Reed A. Cartwright <reed@cartwright.ht>
 # 
 # This file is part of the Ultimate Source Code Project.
@@ -19,12 +20,21 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+*/
 
-add_library(libmutk STATIC
-    version.cc
-)
-add_dependencies(libmutk configure-version.h)
+#ifndef MUTK_MUTK_HPP
+#define MUTK_MUTK_HPP
 
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
-set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
+#include "version.h"
+
+namespace mutk {
+
+// Check to see if the version number in the header matches the version
+// number in the library.
+bool version_number_check_equal(int version_number = MUTK_VERSION_NUM);
+
+int version_number();
+
+} // namespace mutk
+
+#endif //MUTK_MUTK_HPP

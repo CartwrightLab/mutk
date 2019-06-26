@@ -24,18 +24,21 @@ include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckLibraryExists)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_subdirectory(lib)
 
-include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
+#include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
 
 include("${the_source_dir}/conf/version.cmake")
 
 add_executable(mutk-version mutk-version.cc)
-add_dependencies(mutk-version configure-version.h)
-
+target_link_libraries(mutk-version libmutk)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/mutk.sh.in"
   "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh"
   @ONLY)
 install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
+
+install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk-version" DESTINATION ${CMAKE_INSTALL_BINDIR})

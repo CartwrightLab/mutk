@@ -25,9 +25,16 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "version.h"
+#include <mutk/mutk.hpp>
 
 int main(int argc, char *argv[]) {
-	std::cerr << "MUTK v" MUTK_VERSION_STR_LONG << std::endl;
+    if(mutk::version_number_check_equal() == false) {
+        std::cerr << "ERROR: Version mismatch between headers (#"
+                  << MUTK_VERSION_NUM << ") and library (#"
+                  << mutk::version_number() << ").\n";
+        std::cerr << "       MUTK linked against wrong version of library.\n";
+        return EXIT_FAILURE;
+    }
+	std::cout << "MUTK v" MUTK_VERSION_STR_LONG << std::endl;
 	return EXIT_SUCCESS;
 }
