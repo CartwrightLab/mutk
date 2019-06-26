@@ -24,6 +24,18 @@
 
 #include <mutk/mutk.hpp>
 
+// do some version number sanity checks
+#define MUTK_VERSION_DOAPPEND0(val) val ## 0
+#define MUTK_VERSION_APPEND0(val) MUTK_VERSION_DOAPPEND0(val)
+#define MUTK_VERSION_PATCH0 MUTK_VERSION_APPEND0(MUTK_VERSION_PATCH)
+
+static_assert(MUTK_VERSION_MAJOR >= 0 && MUTK_VERSION_MAJOR < 1000,
+    "MUTK major version must be less than 1000.");
+static_assert(MUTK_VERSION_MINOR >= 0 && MUTK_VERSION_MINOR < 1000,
+    "MUTK minor version must be less than 1000." );
+static_assert(MUTK_VERSION_PATCH0 >= 0 && MUTK_VERSION_PATCH0 < 1000,
+    "MUTK patch version must be less than 100." );
+
 bool mutk::version_number_check_equal(int version_num) {
 	return version_num == MUTK_VERSION_NUM;
 }
