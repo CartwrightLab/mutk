@@ -1,0 +1,13 @@
+# Ideas
+
+## version.cmake improvements
+
+- Define a function/macro that makes it easier to call on different projects with different outputs: configure_ver
+- Use CONFVER_ or VERNUM_ or VN_ or VNDB_ or SEMVER_ as prefix
+- Replace a user-derived .in file with an internal format.
+- Then have users use that file to create their own formats. This allows one version+git database to be used by multiple files
+- Read https://semver.org/
+- Set _PATCH to zero instead of undefined on a prerelease
+- Allow prerelease tag to be modified
+- Add tag information to semver db.
+- https://github.com/toeb/cmakepp
