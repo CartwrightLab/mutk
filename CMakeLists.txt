@@ -52,13 +52,17 @@ option(DEVEL_MODE "Enable developer mode.")
 project(MUTK VERSION 0.1
   DESCRIPTION "Mutation Toolkit"
   HOMEPAGE_URL "https://github.com/ultimatesource/mutk/"
-  LANGUAGES CXX C)
+  LANGUAGES CXX C
+)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-# Access git meta data
+# Gitmeta data and semantic versioning
 include("${the_source_dir}/conf/gitmeta.cmake")
+include("${the_source_dir}/conf/semver.cmake")
+
+add_semver_file(MUTK METADATA_GIT)
 
 ## Guard against bad build-type strings
 if(CMAKE_BUILD_TYPE)

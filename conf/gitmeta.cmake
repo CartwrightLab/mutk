@@ -27,6 +27,8 @@ set(gitmeta_always)
 
 find_package(Git)
 
+set(GITMETA_DIRTY_STR)
+
 # Process Git Hash information
 if("$Format:$" STREQUAL "")
   set(GITMETA_HASH       "$Format:%H$")
@@ -79,10 +81,20 @@ else()
   set(GITMETA_DIRTY      "<unknown>")
 endif()
 
+string(APPEND configure_script_code "
+  if(GITMETA_DIRTY)
+    set(GITMETA_DIRTY_STR \"dirty\")
+  endif()
+  string(JOIN \"-\" GITMETA_METADATA \"g\${GITMETA_HASH_SHORT}\" \${GITMETA_DIRTY_STR})
+  message(STATUS \"Git Metadata: \${GITMETA_METADATA}\")
+")
+
 set(gitmeta_env
   GITMETA_HASH
   GITMETA_HASH_SHORT
   GITMETA_DIRTY
+  GITMETA_DIRTY_STR
+  GITMETA_METADATA
 )
 
 configured_file_content_varonly(gitmeta_content ${gitmeta_env})
@@ -90,7 +102,7 @@ configured_file_content_varonly(gitmeta_content ${gitmeta_env})
 add_configured_file(gitmeta.version
   CONTENT "${gitmeta_content}"
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gitmeta.version"
-  ${always}
+  ${gitmeta_always}
   VARIABLES ${gitmeta_env}
 )
 

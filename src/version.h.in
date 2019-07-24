@@ -1,26 +1,10 @@
 #ifndef MUTK_VERSION_H_FILE
 #define MUTK_VERSION_H_FILE
 
-#define MUTK_VERSION_NUM  @the_version_num@
-#define MUTK_VERSION_STR  "@the_version_str@"
-#define MUTK_VERSION_STR_LONG  "@the_version_str_long@"
-#define MUTK_VERSION_MAJOR @the_version_major@
-#define MUTK_VERSION_MINOR @the_version_minor@
-#define MUTK_VERSION_PATCH @the_version_patch@
-#define MUTK_VERSION_HASH "@the_version_git_hash@"
-#define MUTK_VERSION_HASH_SHORT "@the_version_git_hash_short@"
-#define MUTK_VERSION_DIRTY "@the_version_git_dirty@"
-
-#if 0
-set(MUTK_VERSION_NUM @the_version_num@)
-set(MUTK_VERSION_STR  "@the_version_str@")
-set(MUTK_VERSION_STR_LONG  "@the_version_str_long@")
-set(MUTK_VERSION_MAJOR @the_version_major@)
-set(MUTK_VERSION_MINOR @the_version_minor@)
-set(MUTK_VERSION_PATCH @the_version_patch@)
-set(MUTK_VERSION_HASH "@the_version_git_hash@")
-set(MUTK_VERSION_HASH_SHORT "@the_version_git_hash_short@")
-set(MUTK_VERSION_DIRTY "@the_version_git_dirty@")
-#endif
+#define MUTK_VERSION         "@MUTK_SEMVER_VERSION@"
+#define MUTK_VERSION_INTEGER  @MUTK_SEMVER_INTEGER@
+#define MUTK_VERSION_MAJOR    @MUTK_SEMVER_MAJOR@
+#define MUTK_VERSION_MINOR    @MUTK_SEMVER_MINOR@
+#define MUTK_VERSION_PATCH    @MUTK_SEMVER_PATCH@
 
 #endif // MUTK_VERSION_H_FILE

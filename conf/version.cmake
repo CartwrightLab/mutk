@@ -22,8 +22,6 @@ math(EXPR the_version_num
 
 message(STATUS "Project Version: ${the_version_str}")
 
-
-
 set(configure_script "${version_dest_file}.cmake")
 
 file(WRITE "${configure_script}"

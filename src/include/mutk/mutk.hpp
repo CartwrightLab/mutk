@@ -31,7 +31,7 @@ namespace mutk {
 
 // Check to see if the version number in the header matches the version
 // number in the library.
-bool version_number_check_equal(int version_number = MUTK_VERSION_NUM);
+bool version_number_check_equal(int version_number = MUTK_VERSION_INTEGER);
 
 int version_number();
 

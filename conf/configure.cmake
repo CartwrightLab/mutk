@@ -52,7 +52,7 @@ function(add_configured_file name)
   # Process arguments
   set(options ALWAYS)
   set(oneValueArgs INPUT OUTPUT CONTENT)
-  set(multiValueArgs VARIABLES)
+  set(multiValueArgs EXTRA_DEPS VARIABLES)
   cmake_parse_arguments(add_conf_file "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN} )
 
@@ -73,20 +73,21 @@ function(add_configured_file name)
   # use fake file to force building if ALWAYS is requested
   if(add_conf_file_ALWAYS)
     set(output "${add_conf_file_OUTPUT}.noexist")
-    set(byproducts "${add_conf_file_OUTPUT}")
+    set(byproducts BYPRODUCTS "${add_conf_file_OUTPUT}")
   else()
     set(output "${add_conf_file_OUTPUT}")
-    set(byproducts "")
+    set(byproducts)
   endif()
 
   # Command to create file
   add_custom_command(
     OUTPUT  "${output}"
-    BYPRODUCTS "${byproducts}"
-    COMMAND "$(CMAKE_COMMAND)" -P "${script}"
+    ${byproducts}
+    COMMAND "${CMAKE_COMMAND}" -P "${script}"
     MAIN_DEPENDENCY "${add_conf_file_INPUT}"
     DEPENDS "${add_conf_file_INPUT}"
             "${script}"
+            ${add_conf_file_EXTRA_DEPS}
     WORKING_DIRECTORY
             "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Configuring: ${name}"

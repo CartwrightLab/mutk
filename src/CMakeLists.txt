@@ -30,7 +30,21 @@ add_subdirectory(lib)
 
 #include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
 
-include("${the_source_dir}/conf/version.cmake")
+set(configure_script_code "
+include(\"${CMAKE_CURRENT_BINARY_DIR}/../MUTK.version\")\n
+")
+add_configured_file(version.h
+    INPUT "${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    EXTRA_DEPS "${CMAKE_CURRENT_BINARY_DIR}/../MUTK.version"
+    VARIABLES MUTK_SEMVER_VERSION
+              MUTK_SEMVER_INTEGER
+              MUTK_SEMVER_MAJOR
+              MUTK_SEMVER_MINOR
+              MUTK_SEMVER_PATCH              
+)
+add_dependencies(configure-version.h configure-MUTK.version)
+set(configure_script_code)
 
 add_executable(mutk-version mutk-version.cc)
 target_link_libraries(mutk-version libmutk)
