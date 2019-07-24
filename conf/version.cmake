@@ -22,60 +22,7 @@ math(EXPR the_version_num
 
 message(STATUS "Project Version: ${the_version_str}")
 
-# Process Git Hash information
-set(THE_SOURCE_BUILT_FROM_GIT)
-if("$Format:$" STREQUAL "")
-  set(the_version_git_hash       "$Format:%H$")
-  set(the_version_git_hash_short "$Format:%h$")
 
-  option(THE_SOURCE_IS_PATCHED "Set to ON if patches have been applied." OFF)
-  if(THE_SOURCE_IS_PATCHED)
-    set(the_version_git_dirty "dirty")
-  endif()
-elseif(GIT_FOUND)
-  set(configure_code "
-if (IS_DIRECTORY \"${the_source_dir}/.git\")
-  set(THE_SOURCE_BUILT_FROM_GIT TRUE)
-  execute_process(
-    COMMAND           \"${GIT_EXECUTABLE}\"
-                      rev-parse
-                      HEAD
-    WORKING_DIRECTORY \"${the_source_dir}\"
-    RESULT_VARIABLE   git_return
-    OUTPUT_VARIABLE   the_version_git_hash)
-  execute_process(
-    COMMAND           \"${GIT_EXECUTABLE}\"
-                      rev-parse
-                      --short
-                      HEAD
-    WORKING_DIRECTORY \"${the_source_dir}\"
-    RESULT_VARIABLE   git_return
-    OUTPUT_VARIABLE   the_version_git_hash_short)
-  execute_process(
-    COMMAND           \"${GIT_EXECUTABLE}\"
-                      diff
-                      --no-ext-diff
-                      --quiet
-                      --exit-code
-    WORKING_DIRECTORY \"${the_source_dir}\"
-    RESULT_VARIABLE   git_return)
-  string(STRIP \"\${the_version_git_hash}\" the_version_git_hash)
-  string(STRIP \"\${the_version_git_hash_short}\" the_version_git_hash_short)
-  if(git_return)
-    set(the_version_git_dirty \"dirty\")
-  endif()
-
-#  message(STATUS \"version: \${the_version_str}\")
-#  message(STATUS \"git hash: \${the_version_git_hash}\")
-#  message(STATUS \"git short hash: \${the_version_git_hash_short}\")
-#  message(STATUS \"git dirty: \${the_version_git_dirty}\")
-endif()
-")
-else()
-  set(the_version_git_hash       "<unknown>")
-  set(the_version_git_hash_short "<unknown>")
-  set(the_version_git_dirty      "<unknown>")
-endif()
 
 set(configure_script "${version_dest_file}.cmake")
 

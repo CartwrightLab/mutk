@@ -20,12 +20,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-cmake_minimum_required(VERSION 3.2.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5.0 FATAL_ERROR)
 cmake_policy(SET CMP0025 NEW)
 cmake_policy(SET CMP0048 NEW)
 
+# guard against in-source builds
 set(the_source_dir "${CMAKE_CURRENT_SOURCE_DIR}")
 set(the_binary_dir "${CMAKE_CURRENT_BINARY_DIR}")
+
+if("${the_source_dir}" STREQUAL "${the_binary_dir}")
+  message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
+endif()
 
 ################################################################################
 #  Mutation Toolkit Project Configuration
@@ -52,18 +57,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-# guard against in-source builds
-if("${the_source_dir}" STREQUAL "${the_binary_dir}")
-  message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
-endif()
-
-# Check if we are in a git repository
-find_package(Git)
-if(GIT_FOUND)
-  if(IS_DIRECTORY "${the_source_dir}/.git")
-    set(the_source_is_in_git ON)
-  endif()
-endif()
+# Access git meta data
+include("${the_source_dir}/conf/gitmeta.cmake")
 
 ## Guard against bad build-type strings
 if(CMAKE_BUILD_TYPE)
@@ -81,7 +76,6 @@ if(CMAKE_BUILD_TYPE)
     endif()
   endif()
 endif()
-
 
 ################################################################################
 # Always make a full statement RPATH
