@@ -37,11 +37,11 @@ add_configured_file(version.h
     INPUT "${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/version.h"
     EXTRA_DEPS "${CMAKE_CURRENT_BINARY_DIR}/../${CMAKE_PROJECT_NAME}.version"
-    VARIABLES MUTK_SEMVER_VERSION
-              MUTK_SEMVER_INTEGER
-              MUTK_SEMVER_MAJOR
-              MUTK_SEMVER_MINOR
-              MUTK_SEMVER_PATCH              
+    VARIABLES ${CMAKE_PROJECT_NAME}_SEMVER_VERSION
+              ${CMAKE_PROJECT_NAME}_SEMVER_INTEGER
+              ${CMAKE_PROJECT_NAME}_SEMVER_MAJOR
+              ${CMAKE_PROJECT_NAME}_SEMVER_MINOR
+              ${CMAKE_PROJECT_NAME}_SEMVER_PATCH
 )
 add_dependencies(configure-version.h configure-${CMAKE_PROJECT_NAME}.version)
 set(configure_script_code)
