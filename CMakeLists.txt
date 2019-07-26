@@ -83,8 +83,11 @@ IF(DEVEL_MODE)
 ENDIF()
 
 ## Turn on unit and executable testing
-ENABLE_TESTING()
+enable_testing()
 include("conf/doctest.cmake")
+
+add_custom_target(pretest ALL)
+add_dependencies(pretest configure)
 
 ## Enable Developer CMake Flags
 include("conf/devopt.cmake")

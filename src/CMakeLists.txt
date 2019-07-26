@@ -57,6 +57,17 @@ configure_file(
   @ONLY)
 install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
 
-add_executable(mutk-doctest mutk-doctest.cc $<TARGET_OBJECTS:libmutk-doctest>)
+add_executable(mutk-doctest EXCLUDE_FROM_ALL 
+  mutk-doctest.cc $<TARGET_OBJECTS:libmutk-doctest>)
 target_link_libraries(mutk-doctest doctest::doctest)
-doctest_discover_tests(mutk-doctest)
+
+doctest_discover_tests(mutk-doctest PROPERTIES "FIXTURES_REQUIRED;doctest_fixture")
+
+add_test(NAME [=["[pretest] build_mutk-doctest"]=] COMMAND "${CMAKE_COMMAND}"
+  --build "${CMAKE_BINARY_DIR}"
+  --config "$<CONFIG>"
+  --target mutk-doctest
+)
+set_tests_properties([=["[pretest] build_mutk-doctest"]=] PROPERTIES FIXTURES_SETUP doctest_fixture)
+
+add_dependencies(pretest mutk-doctest)

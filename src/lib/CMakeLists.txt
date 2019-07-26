@@ -32,10 +32,9 @@ target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../includ
 target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
 set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
 
-add_library(libmutk-doctest OBJECT ${mutk_sources})
-get_property(doctest_include_dir TARGET doctest::doctest
-    PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(libmutk-doctest PRIVATE ${doctest_include_dir})
-get_property(libmutk_include_dir TARGET libmutk
-    PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(libmutk-doctest PRIVATE ${libmutk_include_dir})
+add_library(libmutk-doctest EXCLUDE_FROM_ALL OBJECT ${mutk_sources})
+target_include_directories(libmutk-doctest PRIVATE
+    $<TARGET_PROPERTY:doctest::doctest,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:libmutk,INTERFACE_INCLUDE_DIRECTORIES>
+)
+add_dependencies(libmutk-doctest configure-version.h)
