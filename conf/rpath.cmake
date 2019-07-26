@@ -20,12 +20,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_library(libmutk STATIC
-    version.cc
-)
-add_dependencies(libmutk configure-version.h)
-target_compile_features(libmutk PUBLIC cxx_std_17)
+################################################################################
+# Always make a full statement RPATH
+# See http://www.itk.org/Wiki/CMake_RPATH_handling
 
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
-set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
+SET(CMAKE_SKIP_BUILD_RPATH FALSE)
+SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" is_system_dir)
+IF("${is_system_dir}" STREQUAL "-1")
+  SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
+ENDIF("${is_system_dir}" STREQUAL "-1")
+################################################################################

@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-cmake_minimum_required(VERSION 3.5.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
 cmake_policy(SET CMP0025 NEW)
 cmake_policy(SET CMP0048 NEW)
 
@@ -54,15 +54,12 @@ project(MUTK VERSION 0.1
   HOMEPAGE_URL "https://github.com/ultimatesource/mutk/"
   LANGUAGES CXX C
 )
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS ON)
 
 # Gitmeta data and semantic versioning
-include("${the_source_dir}/conf/gitmeta.cmake")
-include("${the_source_dir}/conf/semver.cmake")
+include("conf/gitmeta.cmake")
+include("conf/semver.cmake")
 
-add_semver_file(MUTK METADATA_GIT)
+add_semver_file(${CMAKE_PROJECT_NAME} METADATA_GIT)
 
 ## Guard against bad build-type strings
 if(CMAKE_BUILD_TYPE)
@@ -81,20 +78,6 @@ if(CMAKE_BUILD_TYPE)
   endif()
 endif()
 
-################################################################################
-# Always make a full statement RPATH
-# See http://www.itk.org/Wiki/CMake_RPATH_handling
-
-SET(CMAKE_SKIP_BUILD_RPATH FALSE)
-SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
-SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" is_system_dir)
-IF("${is_system_dir}" STREQUAL "-1")
-  SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
-ENDIF("${is_system_dir}" STREQUAL "-1")
-################################################################################
-
 IF(DEVEL_MODE)
   ADD_DEFINITIONS(-DMUTK_DEVELOPER_MODE)
 ENDIF()
@@ -103,7 +86,7 @@ ENDIF()
 ENABLE_TESTING()
 
 ## Enable Developer CMake Flags
-include("${the_source_dir}/conf/devopt.cmake")
+include("conf/devopt.cmake")
 
 configure_file(mutk.sublime-project mutk.sublime-project COPYONLY)
 

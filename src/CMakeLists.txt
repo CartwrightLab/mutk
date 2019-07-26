@@ -31,19 +31,19 @@ add_subdirectory(lib)
 #include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
 
 set(configure_script_code "
-include(\"${CMAKE_CURRENT_BINARY_DIR}/../MUTK.version\")\n
+include(\"${CMAKE_CURRENT_BINARY_DIR}/../${CMAKE_PROJECT_NAME}.version\")\n
 ")
 add_configured_file(version.h
     INPUT "${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/version.h"
-    EXTRA_DEPS "${CMAKE_CURRENT_BINARY_DIR}/../MUTK.version"
+    EXTRA_DEPS "${CMAKE_CURRENT_BINARY_DIR}/../${CMAKE_PROJECT_NAME}.version"
     VARIABLES MUTK_SEMVER_VERSION
               MUTK_SEMVER_INTEGER
               MUTK_SEMVER_MAJOR
               MUTK_SEMVER_MINOR
               MUTK_SEMVER_PATCH              
 )
-add_dependencies(configure-version.h configure-MUTK.version)
+add_dependencies(configure-version.h configure-${CMAKE_PROJECT_NAME}.version)
 set(configure_script_code)
 
 add_executable(mutk-version mutk-version.cc)
@@ -55,4 +55,3 @@ configure_file(
   "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh"
   @ONLY)
 install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
-
