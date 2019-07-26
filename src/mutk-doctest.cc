@@ -22,35 +22,5 @@
 # SOFTWARE.
 */
 
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-
-#include <mutk/mutk.hpp>
-
-// do some version number sanity checks
-#define MUTK_VERSION_DOAPPEND0(val) val ## 0
-#define MUTK_VERSION_APPEND0(val) MUTK_VERSION_DOAPPEND0(val)
-#define MUTK_VERSION_PATCH0 MUTK_VERSION_APPEND0(MUTK_VERSION_PATCH)
-
-static_assert(MUTK_VERSION_MAJOR >= 0 && MUTK_VERSION_MAJOR < 1000,
-    "MUTK major version must be less than 1000.");
-static_assert(MUTK_VERSION_MINOR >= 0 && MUTK_VERSION_MINOR < 1000,
-    "MUTK minor version must be less than 1000." );
-static_assert(MUTK_VERSION_PATCH >= 0 && MUTK_VERSION_PATCH < 1000,
-    "MUTK patch version must be less than 1000." );
-
-bool mutk::version_number_check_equal(int version_int) {
-	return version_int == MUTK_VERSION_INTEGER;
-}
-
-TEST_CASE("[libmutk] version_number_check_equal") {
-    CHECK(mutk::version_number_check_equal(MUTK_VERSION_INTEGER) == true);
-    CHECK(mutk::version_number_check_equal(-1) == false);
-}
-
-int mutk::version_integer() {
-    return MUTK_VERSION_INTEGER;
-}
-
-TEST_CASE("[libmutk] version_integer") {
-    CHECK(mutk::version_integer() == MUTK_VERSION_INTEGER);
-}

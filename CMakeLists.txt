@@ -84,6 +84,7 @@ ENDIF()
 
 ## Turn on unit and executable testing
 ENABLE_TESTING()
+include("conf/doctest.cmake")
 
 ## Enable Developer CMake Flags
 include("conf/devopt.cmake")

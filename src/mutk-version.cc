@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     if(mutk::version_number_check_equal() == false) {
         std::cerr << "ERROR: Version mismatch between headers (#"
                   << MUTK_VERSION_INTEGER << ") and library (#"
-                  << mutk::version_number() << ").\n";
+                  << mutk::version_integer() << ").\n";
         std::cerr << "       MUTK linked against wrong version of library.\n";
         return EXIT_FAILURE;
     }

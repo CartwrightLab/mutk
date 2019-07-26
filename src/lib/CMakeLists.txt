@@ -20,12 +20,22 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_library(libmutk STATIC
-    version.cc
-)
+set(mutk_sources version.cc)
+
+add_library(libmutk STATIC ${mutk_sources})
 add_dependencies(libmutk configure-version.h)
 target_compile_features(libmutk PUBLIC cxx_std_17)
+target_link_libraries(libmutk PUBLIC doctest::doctest)
+target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
 
 target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
 set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
+
+add_library(libmutk-doctest OBJECT ${mutk_sources})
+get_property(doctest_include_dir TARGET doctest::doctest
+    PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(libmutk-doctest PRIVATE ${doctest_include_dir})
+get_property(libmutk_include_dir TARGET libmutk
+    PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(libmutk-doctest PRIVATE ${libmutk_include_dir})

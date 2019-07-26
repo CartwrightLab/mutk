@@ -33,7 +33,7 @@ namespace mutk {
 // number in the library.
 bool version_number_check_equal(int version_number = MUTK_VERSION_INTEGER);
 
-int version_number();
+int version_integer();
 
 } // namespace mutk
 
