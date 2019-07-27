@@ -20,31 +20,31 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set(mutk_sources version.cc)
-set(mutk_headers mutk.hpp)
+set(clang_format_names clang-format)
 
-#####################################################################
-# libmutk library
-foreach(source IN LISTS mutk_headers)
-    list(APPEND mutk_headers_ "${CMAKE_CURRENT_SOURCE_DIR}/../include/mutk/${source}")
-endforeach()
-set(mutk_headers ${mutk_headers_})
-
-add_library(libmutk STATIC ${mutk_sources} ${mutk_headers})
-add_dependencies(libmutk configure-version.h)
-target_compile_features(libmutk PUBLIC cxx_std_17)
-target_link_libraries(libmutk PUBLIC doctest::doctest)
-target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
-
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
-set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
-
-add_library(libmutk-doctest EXCLUDE_FROM_ALL OBJECT ${mutk_sources})
-target_include_directories(libmutk-doctest PRIVATE
-    $<TARGET_PROPERTY:doctest::doctest,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:libmutk,INTERFACE_INCLUDE_DIRECTORIES>
+find_program(CLANG_FORMAT_EXECUTABLE
+  NAMES ${clang_format_names}
+  DOC "clang-format command line client"
 )
-add_dependencies(libmutk-doctest configure-version.h)
 
-clang_format_target(libmutk)
+unset(clang_format_names)
+
+mark_as_advanced(CLANG_FORMAT_EXECUTABLE)
+
+if(CLANG_FORMAT_EXECUTABLE)
+  execute_process(COMMAND "${CLANG_FORMAT_EXECUTABLE}" -version
+                  OUTPUT_VARIABLE clang_format_version_str
+                  ERROR_QUIET
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(clang_format_version_str MATCHES "^clang-format version ([0-9][0-9.]+)")
+    set(CLANG_FORMAT_VERSION "${CMAKE_MATCH_1}")
+  endif()
+
+  unset(clang_format_version_str)
+endif()
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(ClangFormat
+  REQUIRED_VARS CLANG_FORMAT_EXECUTABLE
+  VERSION_VAR CLANG_FORMAT_VERSION
+)

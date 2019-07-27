@@ -32,3 +32,51 @@ if(DEVOPT_ENABLE_COVERAGE_REPORT)
     endif()
   endif()
 endif()
+
+# Setup code formatting if possible
+find_package(ClangFormat)
+
+function(clang_format_files name)
+  if(NOT ClangFormat_FOUND)
+    return() # a NOOP 
+  endif()
+  
+  foreach(source ${ARGN})
+    get_filename_component(source "${source}" ABSOLUTE)
+    list(APPEND sources "${source}")
+  endforeach()
+
+  add_custom_target(format_${name}
+    COMMAND ${CLANG_FORMAT_EXECUTABLE}
+      -style=file -i ${sources}
+    COMMENT
+      "Formating sources of ${name} ..."
+  )
+  if(TARGET format)
+    add_dependencies(format format_${name})
+  else()
+    add_custom_target(format DEPENDS format_${name})
+  endif()
+
+  add_custom_target(check_format_${name}
+    COMMAND ${CLANG_FORMAT_EXECUTABLE}
+      -style=file -output-replacements-xml
+      ${sources} > ${CMAKE_BINARY_DIR}/check_format_${name}.xml
+    COMMAND ! grep -q "'\\breplacement\\b'" ${CMAKE_BINARY_DIR}/check_format_${name}.xml
+    BYPRODUCTS 
+      ${CMAKE_BINARY_DIR}/check_format_${name}.xml
+    COMMENT
+      "Checking format of sources of ${name} ..."
+  )
+  if(TARGET check_format)
+    add_dependencies(check_format check_format_${name})
+  else()
+    add_custom_target(check_format DEPENDS check_format_${name})
+  endif()
+
+endfunction()
+
+function(clang_format_target target) 
+  get_target_property(target_sources "${target}" SOURCES)
+  clang_format_files("${target}" ${target_sources})
+endfunction()

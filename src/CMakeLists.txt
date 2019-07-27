@@ -29,8 +29,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_subdirectory(contrib)
 add_subdirectory(lib)
 
-#include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}")
-
+# Setup a target that will build version.h.in -> version.h
 set(configure_script_code "
 include(\"${CMAKE_CURRENT_BINARY_DIR}/../${CMAKE_PROJECT_NAME}.version\")\n
 ")
@@ -45,18 +44,24 @@ add_configured_file(version.h
               ${CMAKE_PROJECT_NAME}_SEMVER_PATCH
 )
 add_dependencies(configure-version.h configure-${CMAKE_PROJECT_NAME}.version)
-set(configure_script_code)
+unset(configure_script_code)
 
+# mutk-version
 add_executable(mutk-version mutk-version.cc)
 target_link_libraries(mutk-version libmutk)
 install(TARGETS mutk-version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
+clang_format_target(mutk-version)
+
+# mutk main script
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/mutk.sh.in"
   "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh"
   @ONLY)
 install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
 
+###########################################################
+# Unit Test support
 add_executable(mutk-doctest EXCLUDE_FROM_ALL 
   mutk-doctest.cc $<TARGET_OBJECTS:libmutk-doctest>)
 target_link_libraries(mutk-doctest doctest::doctest)
