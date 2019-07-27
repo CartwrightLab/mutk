@@ -32,6 +32,9 @@ if(DEVOPT_ENABLE_COVERAGE_REPORT AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   else()
     target_link_libraries(devopt_coverage INTERFACE --coverage)
   endif()
+
+  # setup targets for generating reports
+  add_subdirectory("${CMAKE_SOURCE_DIR}/coverage")
 endif()
 
 #####################################################################
