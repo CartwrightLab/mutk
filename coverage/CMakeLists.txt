@@ -28,6 +28,9 @@ set(gcovr_exclude
 
 find_package(Gcovr)
 
+# if gcovr was found add targets
+#   make coverage_html
+#   make coverage_xml
 if(Gcovr_FOUND)
   foreach(pat IN LISTS gcovr_exclude)
     LIST(APPEND gcovr_exclude_ --exclude "${pat}")
@@ -61,19 +64,22 @@ if(Gcovr_FOUND)
   add_custom_target(coverage_xml
     DEPENDS "${gcovr_xml}"
   )
-
-  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/download_codecov.cmake" CONTENT "
-file(DOWNLOAD https://codecov.io/bash \"${CMAKE_CURRENT_BINARY_DIR}/codecov.bash\")
-  ")
-
-  add_custom_command(
-    OUTPUT codecov.bash
-    COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/download_codecov.cmake"
-  )
-
-  add_custom_target(upload_codecov
-    DEPENDS codecov.bash
-    COMMAND rm -f "${gcovr_xml}"
-    COMMAND bash "${CMAKE_CURRENT_BINARY_DIR}/codecov.bash"
-  )
 endif()
+
+# Create a script to download codecov.bash script
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/download_codecov.cmake" CONTENT "
+file(DOWNLOAD https://codecov.io/bash \"${CMAKE_CURRENT_BINARY_DIR}/codecov.bash\")
+")
+
+# Add support for codecov.io
+#   make upload_codecov
+add_custom_command(
+  OUTPUT codecov.bash
+  COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/download_codecov.cmake"
+)
+
+add_custom_target(upload_codecov
+  DEPENDS codecov.bash
+  COMMAND rm -f "${gcovr_xml}"
+  COMMAND bash "${CMAKE_CURRENT_BINARY_DIR}/codecov.bash"
+)
