@@ -15,23 +15,27 @@ if(DEVOPT_ENABLE_GPERFTOOLS)
   endif()
 endif()
 
-if(DEVOPT_ENABLE_COVERAGE_REPORT)
-  ## Only compatible with debug builds
-  if(CMAKE_BUILD_TYPE)
-    string(TOLOWER "${CMAKE_BUILD_TYPE}" cmake_build_type_tolower)
-    if(NOT cmake_build_type_tolower STREQUAL "debug")
-        message(FATAL_ERROR "Unsupported build type \"${CMAKE_BUILD_TYPE}\". DEVOPT_ENABLE_COVERAGE_REPORT can only be used with a debug build.")
-    else()
-        message(STATUS "DEVOPT: Coverage report enabled.")
-        SET(COVERAGE_FLAGS --coverage)
-        SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${COVERAGE_FLAGS}")
-        SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} ${COVERAGE_FLAGS}")
-        SET(CMAKE_EXE_LINKER_FLAGS_DEBUG  "${CMAKE_EXE_LINKER_FLAGS_DEBUG} ${COVERAGE_FLAGS}")
-        SET(CMAKE_MODULE_LINKER_FLAGS_DEBUG  "${CMAKE_MODULE_LINKER_FLAGS_DEBUG} ${COVERAGE_FLAGS}")
-        SET(CMAKE_SHARED_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} ${COVERAGE_FLAGS}")
-    endif()
+#####################################################################
+# COVERAGE REPORT
+
+add_library(devopt_coverage INTERFACE)
+
+if(DEVOPT_ENABLE_COVERAGE_REPORT AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  # Add required flags (GCC & LLVM/Clang)
+  target_compile_options(devopt_coverage INTERFACE
+    -O0        # no optimization
+    -g         # generate debug info
+    --coverage # sets all required flags
+  )
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
+    target_link_options(devopt_coverage INTERFACE --coverage)
+  else()
+    target_link_libraries(devopt_coverage INTERFACE --coverage)
   endif()
 endif()
+
+#####################################################################
+# CLANG FORMAT
 
 # Setup code formatting if possible
 find_package(ClangFormat)
