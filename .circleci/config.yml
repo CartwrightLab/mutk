@@ -9,8 +9,8 @@ jobs:
     steps:
       - checkout
       - run:
-        name: Updating Packages
-        command: 'sudo apt-get update'
+          name: Updating Packages
+          command: 'sudo apt-get update'
       - run:
           name: Installing GCC
           command: 'sudo apt-get install gcc g++'
