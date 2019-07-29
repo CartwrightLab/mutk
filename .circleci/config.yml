@@ -9,14 +9,14 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Installing SUDO
-          command: 'apt-get install sudo'
+        name: Updating Packages
+        command: 'sudo apt-get update'
       - run:
           name: Installing GCC
-          command: 'apt-get install gcc g++'
+          command: 'sudo apt-get install gcc g++'
       - run:
           name: Installing CMAKE
-          command: 'apt-get install -y cmake'
+          command: 'sudo apt-get install -y cmake'
       - run:
           name: Creating Build Files
           command: 'cmake -S . -B build'
