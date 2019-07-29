@@ -2,7 +2,7 @@ version: 2.1
 executors:
   default-executor:
     docker:
-      - image: cicrcleci/buildpack-deps:stretch
+      - image: circleci/buildpack-deps:stretch
 jobs:
   build:
     executor: default-executor
