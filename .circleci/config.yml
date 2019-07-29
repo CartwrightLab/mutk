@@ -1,8 +1,11 @@
-version: 2
+version: 2.1
+executors:
+  default-executor:
+    docker:
+      - image: cicrcleci/buildpack-deps:stretch
 jobs:
   build:
-    docker:
-      - image: "debian:stretch"
+    executor: default-executor
     steps:
       - checkout
       - run:
@@ -21,8 +24,7 @@ jobs:
           name: Building ALL
           command: 'cmake --build build'
   test:
-    docker:
-      - image: "debian:stretch"
+    executor: default-executor
     steps:
       - checkout
       - run:
