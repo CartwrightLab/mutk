@@ -13,10 +13,10 @@ jobs:
           command: 'apt-get install -y cmake'
       - run:
           name: Creating Build Files
-          command: 'cmake -S. -Bbuild -DDEVOPT_EXCLUDE_PRETEST_FROM_ALL=On'
+          command: 'cmake -S. -Bbuild/circleci -DDEVOPT_EXCLUDE_PRETEST_FROM_ALL=On'
       - run:
           name: Building ALL
-          command: 'cmake --build build -j 4'
+          command: 'cmake --build build/circleci -j 4'
   test:
     docker:
       - image: gcc:7
@@ -30,16 +30,16 @@ jobs:
           command: 'apt-get install -y cmake'
       - run:
           name: Creating Build Files
-          command: 'cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DDEVOPT_ENABLE_COVERAGE_REPORT=On'
+          command: 'cmake -S . -B build/circleci -DCMAKE_BUILD_TYPE=Debug -DDEVOPT_ENABLE_COVERAGE_REPORT=On'
       - run:
           name: Building Pretest
-          command: 'cmake --build build --target pretest -j 2'
+          command: 'cmake --build build/circleci --target pretest -j 2'
       - run:
           name: Running Tests
-          command: 'cd build && ctest -j 2 --output-on-failure'
+          command: 'cd build/circleci && ctest -j 2 --output-on-failure'
       - run:
           name: Uploading Code Coverage
-          command: 'cmake --build build --target upload_codecov'
+          command: 'cmake --build build/circleci --target upload_codecov'
 workflows:
   version: 2
   build_and_test:
