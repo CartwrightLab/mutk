@@ -1,22 +1,16 @@
-version: 2.1
-executors:
-  default-executor:
-    docker:
-      - image: circleci/buildpack-deps:stretch
+version: 2.0
 jobs:
   build:
-    executor: default-executor
+    docker:
+      - image: gcc:7
     steps:
       - checkout
       - run:
           name: Updating Packages
-          command: 'sudo apt-get update'
-      - run:
-          name: Installing GCC
-          command: 'sudo apt-get install gcc g++'
+          command: 'apt-get update'
       - run:
           name: Installing CMAKE
-          command: 'sudo apt-get install -y cmake'
+          command: 'apt-get install -y cmake'
       - run:
           name: Creating Build Files
           command: 'cmake -S. -Bbuild'
@@ -24,18 +18,16 @@ jobs:
           name: Building ALL
           command: 'cmake --build build'
   test:
-    executor: default-executor
+    docker:
+      - image: gcc:7
     steps:
       - checkout
       - run:
-          name: Installing SUDO
-          command: 'apt-get update && apt-get install -y sudo && rm -rf /var/lib/apt/lists/*'
-      - run:
-          name: Installing GCC
-          command: 'apt-get update && apt-get install -y gcc g++'
+          name: Updating Packages
+          command: 'apt-get update'
       - run:
           name: Installing CMAKE
-          command: 'apt-get update && sudo apt-get install -y cmake'
+          command: 'apt-get install -y cmake'
       - run:
           name: Creating Build Files
           command: 'cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DDEVOPT_ENABLE_COVERAGE_REPORT=On'
@@ -56,4 +48,3 @@ workflows:
       - test:
           requires:
             - build
-
