@@ -42,7 +42,8 @@ function(_generate_configure_script script name source dest)
   string(APPEND script_content "${configure_script_code}")
 
   # Process template
-  string(APPEND script_content "configure_file(\"${source}\" \"${dest}\" @ONLY)\n")
+  string(APPEND script_content "configure_file(\"${source}\" \"${dest}.temp\" @ONLY)\n")
+  string(APPEND script_content "configure_file(\"${dest}.temp\" \"${dest}\" COPYONLY)\n")
 
   # Create file at generation time
   file(GENERATE OUTPUT "${script}" CONTENT "${script_content}")
@@ -72,17 +73,14 @@ function(add_configured_file name)
 
   # use fake file to force building if ALWAYS is requested
   if(add_conf_file_ALWAYS)
-    set(output "${add_conf_file_OUTPUT}.noexist")
-    set(byproducts BYPRODUCTS "${add_conf_file_OUTPUT}")
+    set(output "${add_conf_file_OUTPUT}" "${add_conf_file_OUTPUT}.noexist")
   else()
     set(output "${add_conf_file_OUTPUT}")
-    set(byproducts)
   endif()
 
   # Command to create file
   add_custom_command(
-    OUTPUT  "${output}"
-    ${byproducts}
+    OUTPUT  ${output}
     COMMAND "${CMAKE_COMMAND}" -P "${script}"
     MAIN_DEPENDENCY "${add_conf_file_INPUT}"
     DEPENDS "${add_conf_file_INPUT}"
@@ -98,8 +96,8 @@ function(add_configured_file name)
     DEPENDS "${add_conf_file_OUTPUT}"
     SOURCES "${add_conf_file_INPUT}"
   )
-  set_target_properties(configure-${name}
-    PROPERTIES ADDITIONAL_CLEAN_FILES "${script}")
+  set_property(DIRECTORY APPEND PROPERTY
+    ADDITIONAL_MAKE_CLEAN_FILES "${script}" "${add_conf_file_OUTPUT}.temp")
 
   add_dependencies(configure configure-${name})
   source_group("Configured Files" FILES "${add_conf_file_INPUT}")

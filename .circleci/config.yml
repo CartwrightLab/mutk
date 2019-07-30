@@ -16,7 +16,7 @@ jobs:
           command: 'cmake -S. -Bbuild -DDEVOPT_EXCLUDE_PRETEST_FROM_ALL=On'
       - run:
           name: Building ALL
-          command: 'cmake --build build'
+          command: 'cmake --build build -j 4'
   test:
     docker:
       - image: gcc:7
@@ -33,10 +33,10 @@ jobs:
           command: 'cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DDEVOPT_ENABLE_COVERAGE_REPORT=On'
       - run:
           name: Building Pretest
-          command: 'cmake --build build --target pretest'
+          command: 'cmake --build build -j 4 --target pretest'
       - run:
           name: Running Tests
-          command: 'cmake --build build --target test'
+          command: 'ctest -j 4'
       - run:
           name: Uploading Code Coverage
           command: 'cmake --build build --target upload_codecov'
