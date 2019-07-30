@@ -1,0 +1,9 @@
+// suppression errors caused by doctest.h
+*:*/contrib/doctest/doctest/doctest.h
+
+// suppression two information messages
+unmatchedSuppression
+missingIncludeSystem
+
+// to suppress false positives from unittests
+unusedFunction

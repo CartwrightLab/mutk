@@ -4,6 +4,11 @@ SET(DEVOPT_ENABLE_GPERFTOOLS OFF CACHE BOOL "Enable profiling with gperftools.")
 SET(DEVOPT_ENABLE_COVERAGE_REPORT OFF CACHE BOOL "Enable code coverage reporting.")
 SET(DEVOPT_EXCLUDE_PRETEST_FROM_ALL OFF CACHE BOOL "Do not build the pretest target by default.")
 
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
+
 SET(devopt_LIBRARIES)
 
 if(DEVOPT_ENABLE_GPERFTOOLS)
@@ -55,7 +60,7 @@ function(clang_format_files name)
   endforeach()
 
   add_custom_target(format_${name}
-    COMMAND ${CLANG_FORMAT_EXECUTABLE}
+    COMMAND "${CLANG_FORMAT_EXECUTABLE}"
       -style=file -i ${sources}
     COMMENT
       "Formating sources of ${name} ..."
@@ -67,7 +72,7 @@ function(clang_format_files name)
   endif()
 
   add_custom_target(check_format_${name}
-    COMMAND ${CLANG_FORMAT_EXECUTABLE}
+    COMMAND "${CLANG_FORMAT_EXECUTABLE}"
       -style=file -output-replacements-xml
       ${sources} > ${CMAKE_BINARY_DIR}/check_format_${name}.xml
     COMMAND ! grep -q "'\\breplacement\\b'" ${CMAKE_BINARY_DIR}/check_format_${name}.xml
@@ -88,3 +93,38 @@ function(clang_format_target target)
   get_target_property(target_sources "${target}" SOURCES)
   clang_format_files("${target}" ${target_sources})
 endfunction()
+
+#####################################################################
+# CPPCHECK
+
+find_package(Cppcheck)
+
+if(Cppcheck_FOUND AND CMAKE_EXPORT_COMPILE_COMMANDS)
+
+add_custom_target(cppcheck
+  COMMAND "${CPPCHECK_EXECUTABLE}"
+    "--project=${CMAKE_BINARY_DIR}/compile_commands.json"
+    "--suppressions-list=${CMAKE_CURRENT_LIST_DIR}/cppcheck_suppressions.txt"
+    --enable=all
+    --inline-suppr
+  COMMENT "Looking for programming errors with Cppcheck ..."
+)
+
+add_custom_target(check_cppcheck
+  COMMAND "${CPPCHECK_EXECUTABLE}"
+    "--project=${CMAKE_BINARY_DIR}/compile_commands.json"
+    "--suppressions-list=${CMAKE_CURRENT_LIST_DIR}/cppcheck_suppressions.txt"
+    --enable=all
+    --inline-suppr
+    --error-exitcode=2
+    --xml
+    "--output-file=${CMAKE_BINARY_DIR}/cppcheck_results.xml"
+  BYPRODUCTS
+    "${CMAKE_BINARY_DIR}/cppcheck_results.xml"
+  COMMENT "Checking if source code passes Cppcheck ..."
+)
+
+endif()
+
+
+#--suppressions-list=../../conf/cppcheck_suppressions.txt --project=compile_commands.json

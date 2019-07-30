@@ -60,6 +60,26 @@ jobs:
       - run:
           name: Checking Format
           command: 'cmake --build build/circleci --target check_format -j 2'
+  check_cppcheck:
+    docker:
+      - image: gcc:7
+    steps:
+      - checkout
+      - run:
+          name: Updating Packages
+          command: 'apt-get update'
+      - run:
+          name: Installing CMAKE
+          command: 'apt-get install -y cmake'
+      - run:
+          name: Installing CLANG-FORMAT
+          command: 'apt-get install -y cppcheck'
+      - run:
+          name: Creating Build Files
+          command: 'cmake -S. -Bbuild/circleci'
+      - run:
+          name: Checking Source with Cppcheck
+          command: 'cmake --build build/circleci --target check_cppcheck -j 2'
 workflows:
   version: 2
   build_and_test:
@@ -69,3 +89,4 @@ workflows:
           requires:
             - build
       - check_format
+      - check_cppcheck
