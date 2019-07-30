@@ -86,7 +86,7 @@ string(APPEND configure_script_code "
     set(GITMETA_DIRTY_STR \"dirty\")
   endif()
   string(JOIN \"-\" GITMETA_METADATA \"g\${GITMETA_HASH_SHORT}\" \${GITMETA_DIRTY_STR})
-  message(STATUS \"Git Metadata: \${GITMETA_METADATA}\")
+  #message(STATUS \"Git Metadata: \${GITMETA_METADATA}\")
 ")
 
 set(gitmeta_env
@@ -100,6 +100,7 @@ set(gitmeta_env
 configured_file_content_varonly(gitmeta_content ${gitmeta_env})
 
 add_configured_file(gitmeta.version
+  NOTARGET
   CONTENT "${gitmeta_content}"
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gitmeta.version"
   ${gitmeta_always}

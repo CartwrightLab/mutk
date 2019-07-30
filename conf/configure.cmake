@@ -51,7 +51,7 @@ endfunction()
 
 function(add_configured_file name)
   # Process arguments
-  set(options ALWAYS)
+  set(options NOTARGET ALWAYS EXCLUDE_FROM_CONFIGURE)
   set(oneValueArgs INPUT OUTPUT CONTENT)
   set(multiValueArgs EXTRA_DEPS VARIABLES)
   cmake_parse_arguments(add_conf_file "${options}" "${oneValueArgs}"
@@ -91,16 +91,22 @@ function(add_configured_file name)
     COMMENT "Configuring: ${name}"
   )
 
-  # Custom Target and Properties
-  add_custom_target(configure-${name}
-    DEPENDS "${add_conf_file_OUTPUT}"
-    SOURCES "${add_conf_file_INPUT}"
-  )
+
+  if(NOT add_conf_file_NOTARGET)
+    # Custom Target and Properties
+    add_custom_target(configure-${name}
+      DEPENDS "${add_conf_file_OUTPUT}"
+      SOURCES "${add_conf_file_INPUT}"
+    )
+
+    if(NOT add_conf_file_EXCLUDE_FROM_CONFIGURE)
+      add_dependencies(configure configure-${name})
+    endif()
+  endif()
+  source_group("Configured Files" FILES "${add_conf_file_INPUT}")
+
   set_property(DIRECTORY APPEND PROPERTY
     ADDITIONAL_MAKE_CLEAN_FILES "${script}" "${add_conf_file_OUTPUT}.temp")
-
-  add_dependencies(configure configure-${name})
-  source_group("Configured Files" FILES "${add_conf_file_INPUT}")
 
 endfunction()
 
