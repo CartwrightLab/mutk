@@ -13,7 +13,7 @@ jobs:
           command: 'apt-get install -y cmake'
       - run:
           name: Creating Build Files
-          command: 'cmake -S. -Bbuild'
+          command: 'cmake -S. -Bbuild -DDEVOPT_EXCLUDE_PRETEST_FROM_ALL=On'
       - run:
           name: Building ALL
           command: 'cmake --build build'

@@ -2,6 +2,7 @@
 
 SET(DEVOPT_ENABLE_GPERFTOOLS OFF CACHE BOOL "Enable profiling with gperftools.")
 SET(DEVOPT_ENABLE_COVERAGE_REPORT OFF CACHE BOOL "Enable code coverage reporting.")
+SET(DEVOPT_EXCLUDE_PRETEST_FROM_ALL OFF CACHE BOOL "Do not build the pretest target by default.")
 
 SET(devopt_LIBRARIES)
 

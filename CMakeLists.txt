@@ -55,6 +55,9 @@ project(MUTK VERSION 0.1
   LANGUAGES CXX C
 )
 
+## Enable Developer CMake Flags
+include("conf/devopt.cmake")
+
 # Gitmeta data and semantic versioning
 include("conf/gitmeta.cmake")
 include("conf/semver.cmake")
@@ -78,19 +81,17 @@ if(CMAKE_BUILD_TYPE)
   endif()
 endif()
 
-IF(DEVEL_MODE)
-  ADD_DEFINITIONS(-DMUTK_DEVELOPER_MODE)
-ENDIF()
-
 ## Turn on unit and executable testing
 enable_testing()
 include("conf/doctest.cmake")
 
-add_custom_target(pretest ALL)
-add_dependencies(pretest configure)
+set(pretest_all ALL)
+if(DEVOPT_EXCLUDE_PRETEST_FROM_ALL)
+  set(pretest_all)
+endif()
 
-## Enable Developer CMake Flags
-include("conf/devopt.cmake")
+add_custom_target(pretest ${pretest_all})
+add_dependencies(pretest configure)
 
 configure_file(mutk.sublime-project mutk.sublime-project COPYONLY)
 
