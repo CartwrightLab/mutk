@@ -69,6 +69,7 @@ function(add_semver_file name)
   set(configure_script_code)
   if(semver_METADATA_GIT)
     #set(semver_extradeps "${CMAKE_CURRENT_BINARY_DIR}/gitmeta.version")
+    #set(semver_extradeps "${CMAKE_CURRENT_BINARY_DIR}/gitmeta.version")
     string(APPEND configure_script_code "
 include(\"${CMAKE_CURRENT_BINARY_DIR}/gitmeta.version\")\n
 string(JOIN \".\" ${name}_SEMVER_METADATA \${GITMETA_METADATA} \${${name}_SEMVER_METADATA})
@@ -89,6 +90,7 @@ message(STATUS \"${name} Version: \${${name}_SEMVER_VERSION}\")
   add_configured_file(${name}.version
     CONTENT "${semver_content}"
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${name}.version"
+    ALWAYS
     EXTRA_DEPS ${semver_extradeps}
     VARIABLES ${semver_env}
   )
