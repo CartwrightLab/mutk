@@ -36,7 +36,7 @@ jobs:
           command: 'cmake --build build --target pretest -j 2'
       - run:
           name: Running Tests
-          command: 'ctest -j 2'
+          command: 'cd build && ctest -j 2 --output-on-failure'
       - run:
           name: Uploading Code Coverage
           command: 'cmake --build build --target upload_codecov'
