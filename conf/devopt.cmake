@@ -188,3 +188,10 @@ function(clang_tidy_files name)
   endif()
 
 endfunction()
+
+#####################################################################
+# Check All Target
+
+add_custom_target(check_test COMMAND "${CMAKE_CTEST_COMMAND}" DEPENDS pretest)
+add_custom_target(check_all DEPENDS check_test check_format check_tidy check_cppcheck)
+
