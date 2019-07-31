@@ -27,7 +27,7 @@
 
 #include <mutk/mutk.hpp>
 
-int main(int argc, char *argv[]) {
+int main(int /*argc*/, char* /*argv*/[]) {
     if(mutk::version_number_check_equal() == false) {
         std::cerr << "ERROR: Version mismatch between headers (#"
                   << MUTK_VERSION_INTEGER << ") and library (#"

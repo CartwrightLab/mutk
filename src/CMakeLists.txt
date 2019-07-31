@@ -50,6 +50,7 @@ target_link_libraries(mutk-version libmutk)
 install(TARGETS mutk-version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 clang_format_target(mutk-version)
+clang_tidy_target(mutk-version)
 
 # mutk main script
 configure_file(

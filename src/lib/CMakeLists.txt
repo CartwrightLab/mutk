@@ -49,3 +49,4 @@ add_dependencies(libmutk-doctest configure-version.h)
 target_link_libraries(libmutk-doctest devopt_coverage)
 
 clang_format_target(libmutk)
+clang_tidy_target(libmutk)
