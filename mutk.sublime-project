@@ -1,0 +1,81 @@
+{
+	"folders":
+	[
+		{
+			"path": "../../",
+			"folder_exclude_patterns": ["./build/"]
+		}
+	],
+	"settings": {
+    	"tab_size": 4,
+    	"translate_tabs_to_spaces": true,
+        "compile_commands": "${project_path}"
+	},
+    "SublimeLinter":
+    {
+        "linters":
+        {
+        	"clang": {
+				"extra_flags": "-Wall -std=c++17 -Wno-pragma-once-outside-header",
+            	"include_dirs": [
+                	"${project_path}/../../src/include/",
+                	"${project_path}/src",
+                	"/usr/include/eigen3",
+                	"/usr/include/eigen3/unsupported"
+            	],
+                "disable": true
+            }
+        }
+    },
+	"build_systems":
+	[
+		{
+			"name": "MUTK - all",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "all"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - clean",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "clean"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - test",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "test"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - rebuild_cache",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "rebuild_cache"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - ext_projects",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "ext_projects"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - package_source",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "package_source"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - edit_cache",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "edit_cache"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		},
+		{
+			"name": "MUTK - package",
+			"cmd": ["/usr/bin/ninja", "-f", "build.ninja", "-v", "package"],
+			"working_dir": "${project_path}",
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
+		}
+	]
+	}
