@@ -8,4 +8,4 @@
 
 ### Notes for Developers
  - This release focused on setting up the project infrastructure including
-   unit testing, continuous integration, code formating, and code analysis.
+   unit testing, continuous integration, code formatting, and code analysis.
