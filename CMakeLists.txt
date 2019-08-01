@@ -49,7 +49,7 @@ option(DEVEL_MODE "Enable developer mode.")
 ################################################################################
 # Init Project
 
-project(MUTK VERSION 0.1
+project(MUTK VERSION 0.1.0
   DESCRIPTION "Mutation Toolkit"
   HOMEPAGE_URL "https://github.com/ultimatesource/mutk/"
   LANGUAGES CXX C
