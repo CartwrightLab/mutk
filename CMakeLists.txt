@@ -93,30 +93,31 @@ configure_file(mutk.sublime-project mutk.sublime-project COPYONLY)
 ################################################################################
 # Installation Information
 
-STRING(TOLOWER ${CMAKE_PROJECT_NAME} basename_for_install)
+string(TOLOWER ${CMAKE_PROJECT_NAME} basename_for_install)
 
-SET(CMAKE_DATA_DIR "share/${basename_for_install}" CACHE STRING
+set(CMAKE_DATA_DIR "share/${basename_for_install}" CACHE STRING
   "Install location for data (relative to prefix).")
-SET(CMAKE_DOC_DIR "doc/${basename_for_install}" CACHE STRING
+set(CMAKE_DOC_DIR "doc/${basename_for_install}" CACHE STRING
   "Install location for documentation (relative to prefix).")
-SET(CMAKE_MAN_DIR "man" CACHE STRING
+set(CMAKE_MAN_DIR "man" CACHE STRING
   "Install location for man pages (relative to prefix).")
-MARK_AS_ADVANCED(CMAKE_DATA_DIR CMAKE_DOC_DIR CMAKE_MAN_DIR)
+mark_as_advanced(CMAKE_DATA_DIR CMAKE_DOC_DIR CMAKE_MAN_DIR)
 
-INCLUDE(GNUInstallDirs)
-SET(CMAKE_INSTALL_LIBEXECDIR  "${CMAKE_INSTALL_LIBEXECDIR}/${basename_for_install}")
+include(GNUInstallDirs)
+set(CMAKE_INSTALL_LIBEXECDIR  "${CMAKE_INSTALL_LIBEXECDIR}/${basename_for_install}")
 
-INSTALL(FILES README.md LICENSE DESTINATION ${CMAKE_DOC_DIR})
+install(FILES README.md LICENSE DESTINATION ${CMAKE_DOC_DIR})
 
-ADD_SUBDIRECTORY(src)
-ADD_SUBDIRECTORY(tests)
-ADD_SUBDIRECTORY(doc)
+add_subdirectory(contrib)
+add_subdirectory(src)
+add_subdirectory(tests)
+add_subdirectory(doc)
 
 ########### Add uninstall target ###############
-CONFIGURE_FILE(
+configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/conf/cmake_uninstall.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
   IMMEDIATE @ONLY)
 
-ADD_CUSTOM_TARGET(uninstall
+add_custom_target(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake") 

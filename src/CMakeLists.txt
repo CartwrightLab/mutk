@@ -24,7 +24,6 @@ include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckLibraryExists)
 
-add_subdirectory(contrib)
 add_subdirectory(lib)
 
 # Setup a target that will build version.h.in -> version.h

@@ -26,7 +26,7 @@ set(mutk_headers mutk.hpp)
 #####################################################################
 # libmutk library
 foreach(source IN LISTS mutk_headers)
-    list(APPEND mutk_headers_ "${CMAKE_CURRENT_SOURCE_DIR}/../include/mutk/${source}")
+    list(APPEND mutk_headers_ "${CMAKE_SOURCE_DIR}/src/include/mutk/${source}")
 endforeach()
 set(mutk_headers ${mutk_headers_})
 
@@ -36,7 +36,7 @@ target_compile_features(libmutk PUBLIC cxx_std_17)
 target_link_libraries(libmutk PUBLIC doctest::doctest)
 target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
 
-target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+target_include_directories(libmutk PUBLIC "${CMAKE_SOURCE_DIR}/src/include")
 target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
 set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
 
