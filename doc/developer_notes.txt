@@ -1,3 +1,14 @@
-# Ideas
+# Ideas and Notes
 
+## verb ideas
+
+ - mutk call: call de novo and segregating variants
+ - mutk samplesites: randomly sample sites from a bed file
+ - mutk loglike: calculate the log-likelihood of a dataset
+ - mutk extractregions: sample regions around specific sites from a sam and fasta. Returns sam, fasta, and new bed.
+ - mutk simulate: simulate mutations/variants/change reference
+
+## Possible useful code
 - https://github.com/toeb/cmakepp
+
+

@@ -33,20 +33,29 @@ set(mutk_headers ${mutk_headers_})
 add_library(libmutk STATIC ${mutk_sources} ${mutk_headers})
 add_dependencies(libmutk configure-version.h)
 target_compile_features(libmutk PUBLIC cxx_std_17)
-target_link_libraries(libmutk PUBLIC doctest::doctest)
-target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
-
 target_include_directories(libmutk PUBLIC "${CMAKE_SOURCE_DIR}/src/include")
 target_include_directories(libmutk PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
+target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
+
+target_link_libraries(libmutk PRIVATE doctest::doctest)
+target_link_libraries(libmutk PRIVATE minionrng::minionrng)
+
 set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
 
 add_library(libmutk-doctest EXCLUDE_FROM_ALL OBJECT ${mutk_sources})
-target_include_directories(libmutk-doctest PRIVATE
-    $<TARGET_PROPERTY:doctest::doctest,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:libmutk,INTERFACE_INCLUDE_DIRECTORIES>
+target_compile_features(libmutk-doctest PUBLIC cxx_std_17)
+target_link_libraries(libmutk-doctest PUBLIC
+     $<TARGET_PROPERTY:libmutk,LINK_LIBRARIES>
 )
+target_include_directories(libmutk-doctest PRIVATE
+    $<TARGET_PROPERTY:libmutk,INCLUDE_DIRECTORIES>   
+)
+target_include_directories(libmutk-doctest INTERFACE
+    $<TARGET_PROPERTY:libmutk,INTERFACE_INCLUDE_DIRECTORIES>   
+)
+
 add_dependencies(libmutk-doctest configure-version.h)
-target_link_libraries(libmutk-doctest devopt_coverage)
+target_link_libraries(libmutk-doctest PUBLIC devopt_coverage)
 
 clang_format_target(libmutk)
 clang_tidy_target(libmutk)

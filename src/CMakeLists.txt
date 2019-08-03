@@ -60,9 +60,9 @@ install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTA
 
 ###########################################################
 # Unit Test support
-add_executable(mutk-doctest EXCLUDE_FROM_ALL 
-  mutk-doctest.cc $<TARGET_OBJECTS:libmutk-doctest>)
-target_link_libraries(mutk-doctest doctest::doctest devopt_coverage)
+add_executable(mutk-doctest EXCLUDE_FROM_ALL mutk-doctest.cc)
+
+target_link_libraries(mutk-doctest libmutk-doctest doctest::doctest)
 
 doctest_discover_tests(mutk-doctest PROPERTIES "FIXTURES_REQUIRED;doctest_fixture")
 
