@@ -1,5 +1,5 @@
-// suppression errors caused by doctest.h
-*:*/contrib/doctest/doctest/doctest.h
+// suppression errors caused by contributed code
+*:*/contrib/*
 
 // suppression two information messages
 unmatchedSuppression
