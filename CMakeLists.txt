@@ -25,8 +25,8 @@ cmake_policy(SET CMP0025 NEW)
 cmake_policy(SET CMP0048 NEW)
 
 # guard against in-source builds
-set(the_source_dir "${CMAKE_CURRENT_SOURCE_DIR}")
-set(the_binary_dir "${CMAKE_CURRENT_BINARY_DIR}")
+set(the_source_dir "${CMAKE_SOURCE_DIR}")
+set(the_binary_dir "${CMAKE_BINARY_DIR}")
 
 if("${the_source_dir}" STREQUAL "${the_binary_dir}")
   message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
@@ -88,7 +88,7 @@ endif()
 add_custom_target(pretest ${pretest_all})
 add_dependencies(pretest configure)
 
-configure_file(mutk.sublime-project mutk.sublime-project COPYONLY)
+configure_file(mutk.sublime-project.in mutk.sublime-project @ONLY)
 
 ################################################################################
 # Installation Information
