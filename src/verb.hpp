@@ -22,17 +22,30 @@
 # SOFTWARE.
 */
 
-#include <cstdlib>
+#ifndef MUTK_VERB_HPP
+#define MUTK_VERB_HPP
+
 #include <iostream>
 
 #include <mutk/mutk.hpp>
 
-#include "verb.hpp"
+namespace mutk {
+namespace verb {
 
-int main(int /*argc*/, char* /*argv*/[]) {
-    if(auto check = mutk::verb::check_version_number(); check != EXIT_SUCCESS) {
-        return check;
+inline
+int check_version_number() {
+    if(mutk::version_number_check_equal(MUTK_VERSION_INTEGER) == false) {
+        std::cerr << "ERROR: Version mismatch between headers (#"
+                  << MUTK_VERSION_INTEGER << ") and library (#"
+                  << mutk::version_integer() << ").\n";
+        std::cerr << "       MUTK linked against wrong version of library.\n";
+        return EXIT_FAILURE;
     }
-    std::cout << "MUTK v" MUTK_VERSION << std::endl;
     return EXIT_SUCCESS;
 }
+
+} // namespace verb
+} // namespace mutk
+
+
+#endif
