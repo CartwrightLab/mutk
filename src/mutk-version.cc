@@ -30,8 +30,11 @@
 #include "verb.hpp"
 
 int main(int /*argc*/, char* /*argv*/[]) {
-    if(auto check = mutk::verb::check_version_number(); check != EXIT_SUCCESS) {
-        return check;
+    {
+        auto check = mutk::verb::check_version_number();
+        if(check != EXIT_SUCCESS) {
+            return check;
+        }
     }
     std::cout << "MUTK v" MUTK_VERSION << std::endl;
     return EXIT_SUCCESS;
