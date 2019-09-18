@@ -51,6 +51,15 @@ install(TARGETS mutk-version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 clang_format_target(mutk-version)
 clang_tidy_target(mutk-version)
 
+# mutk-genseed
+add_executable(mutk-genseed mutk-genseed.cc)
+target_link_libraries(mutk-genseed libmutk)
+target_link_libraries(mutk-genseed minionrng::minionrng)
+install(TARGETS mutk-genseed RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+
+clang_format_target(mutk-genseed)
+clang_tidy_target(mutk-genseed)
+
 # mutk main script
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/mutk.sh.in"
