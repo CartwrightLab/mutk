@@ -22,15 +22,42 @@
 # SOFTWARE.
 */
 
+#include <unistd.h>
+
 #include <cstdlib>
-#include <iostream>
+#include <vector>
+
 #include <mutk/mutk.hpp>
 
-#include "verb.hpp"
+#include "@CMAKE_CURRENT_SOURCE_DIR@/verb.hpp"
 
-int main(int /*argc*/, char* /*argv*/[]) {
+const char libexec_dir[] = "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@";
+
+int main(int argc, char * const argv[]) {
     MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
-    std::cout << "MUTK v" MUTK_VERSION << std::endl;
-    return EXIT_SUCCESS;
+    if(argc < 2) {
+        return EXIT_FAILURE;
+    }
+
+    // construct path to mutk executable for the verb command
+    std::string exe_path;
+    exe_path += libexec_dir;
+    exe_path += "/mutk-";
+    exe_path += argv[1];
+
+    // construct new argument vector
+    std::vector<char *> new_argv;
+    new_argv.push_back(exe_path.data());
+    for(int i=2;i<argc;++i) {
+        new_argv.push_back(argv[i]);
+    }
+    new_argv.push_back(nullptr);
+
+    // transfer process to the executable
+    int result = ::execv(new_argv[0], new_argv.data());
+    // execv only returns if there was an error.
+    if(result != 0) {
+        return EXIT_FAILURE;
+    }
 }

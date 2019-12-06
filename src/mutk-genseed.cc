@@ -23,10 +23,8 @@
 */
 
 #include <charconv>
-
-#include <mutk/mutk.hpp>
-
 #include <minion.hpp>
+#include <mutk/mutk.hpp>
 
 #include "verb.hpp"
 

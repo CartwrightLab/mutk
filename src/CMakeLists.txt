@@ -62,10 +62,12 @@ clang_tidy_target(mutk-genseed)
 
 # mutk main script
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/mutk.sh.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh"
+  "${CMAKE_CURRENT_SOURCE_DIR}/mutk.cc.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/mutk.cc"
   @ONLY)
-install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/mutk.sh" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME mutk)
+add_executable(mutk "${CMAKE_CURRENT_BINARY_DIR}/mutk.cc")
+target_link_libraries(mutk libmutk)
+install(TARGETS mutk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 ###########################################################
 # Unit Test support
