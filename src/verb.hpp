@@ -44,6 +44,14 @@ int check_version_number() {
     return EXIT_SUCCESS;
 }
 
+#define MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN() \
+    do { \
+        auto check = mutk::verb::check_version_number(); \
+        if(check != EXIT_SUCCESS) { \
+            return check; \
+        } \
+    } while(false) \
+
 } // namespace verb
 } // namespace mutk
 
