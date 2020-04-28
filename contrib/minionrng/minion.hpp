@@ -88,7 +88,7 @@ class Xoshiro256StarStarEngine {
     const state_type &state() const { return state_; }
     void SetState(const state_type &state) { state_ = state; };
 
-    void InitState(const state_type &seeds);
+    void InitState(const state_type &bits);
 
    protected:
     result_type Next();
@@ -117,16 +117,16 @@ inline Xoshiro256StarStarEngine::result_type Xoshiro256StarStarEngine::Next() {
     return result_starstar;
 }
 
-// Seed the state of the engine
-inline void Xoshiro256StarStarEngine::InitState(const state_type &seeds) {
+// Initialize the state of the engine with user provided bits.
+inline void Xoshiro256StarStarEngine::InitState(const state_type &bits) {
     // start with well mixed bits
     state_ = {UINT64_C(0x5FAF84EE2AA04CFF), UINT64_C(0xB3A2EF3524D89987), UINT64_C(0x5A82B68EF098F79D),
               UINT64_C(0x5D7AA03298486D6E)};
     // add in the seeds
-    state_[0] += seeds[0];
-    state_[1] += seeds[1];
-    state_[2] += seeds[2];
-    state_[3] += seeds[3];
+    state_[0] += bits[0];
+    state_[1] += bits[1];
+    state_[2] += bits[2];
+    state_[3] += bits[3];
     // check to see if state is all zeros and fix
     if(state_[0] == 0 && state_[1] == 0 && state_[2] == 0 && state_[3] == 0) {
         state_[1] = UINT64_C(0x1615CA18E55EE70C);
