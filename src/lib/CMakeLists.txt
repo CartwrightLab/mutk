@@ -24,6 +24,13 @@ set(mutk_sources version.cc)
 set(mutk_headers mutk.hpp)
 
 #####################################################################
+# libmutk dependencies
+
+find_package(Eigen3)
+find_package(HTSlib)
+
+
+#####################################################################
 # libmutk library
 foreach(source IN LISTS mutk_headers)
     list(APPEND mutk_headers_ "${CMAKE_SOURCE_DIR}/src/include/mutk/${source}")
