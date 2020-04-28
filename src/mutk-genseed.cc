@@ -44,12 +44,7 @@ std::string base58_encode(uint64_t u) {
 }  // namespace
 
 int main(int argc, char *argv[]) {
-    {
-        auto check = mutk::verb::check_version_number();
-        if(check != EXIT_SUCCESS) {
-            return check;
-        }
-    }
+    MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
     // User-specified Seeds
     std::vector<uint32_t> user_seeds;
