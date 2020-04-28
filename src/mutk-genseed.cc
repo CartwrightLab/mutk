@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     std::vector<uint32_t> user_seeds;
     // Go through arguments
     for(int i = 1; i < argc; ++i) {
-        int32_t value;
+        int32_t value = 0;
         const char *first = argv[i];
         const char *last = argv[i] + strlen(argv[i]);
         // Does the argument represent a 32-bit signed decimal number
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     minion::Random::state_type state = rand.state();
 
     // Print
-    auto it = state.begin();
+    auto *it = state.begin();
     std::cout << base58_encode(*it);
     for(++it; it != state.end(); ++it) {
         std::cout << "-" << base58_encode(*it);
