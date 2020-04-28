@@ -22,15 +22,15 @@
 # SOFTWARE.
 */
 
-#ifndef MUTK_VERB_HPP
-#define MUTK_VERB_HPP
+#ifndef MUTK_SUBCOMMAND_HPP
+#define MUTK_SUBCOMMAND_HPP
 
 #include <iostream>
 
 #include <mutk/mutk.hpp>
 
 namespace mutk {
-namespace verb {
+namespace subcommand {
 
 inline
 int check_version_number() {
@@ -44,15 +44,15 @@ int check_version_number() {
     return EXIT_SUCCESS;
 }
 
-#define MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN() \
+#define MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN() \
     do { \
-        auto check = mutk::verb::check_version_number(); \
+        auto check = mutk::subcommand::check_version_number(); \
         if(check != EXIT_SUCCESS) { \
             return check; \
         } \
     } while(false) \
 
-} // namespace verb
+} // namespace subcommand
 } // namespace mutk
 
 

@@ -29,12 +29,12 @@
 
 #include <mutk/mutk.hpp>
 
-#include "@CMAKE_CURRENT_SOURCE_DIR@/verb.hpp"
+#include "@CMAKE_CURRENT_SOURCE_DIR@/subcommand.hpp"
 
 const char libexec_dir[] = "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@";
 
 int main(int argc, char * const argv[]) {
-    MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
+    MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
     if(argc < 2) {
         return EXIT_FAILURE;

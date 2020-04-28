@@ -26,7 +26,7 @@
 #include <minion.hpp>
 #include <mutk/mutk.hpp>
 
-#include "verb.hpp"
+#include "subcommand.hpp"
 
 namespace {
 const char *base58_alphabet =
@@ -44,7 +44,7 @@ std::string base58_encode(uint64_t u) {
 }  // namespace
 
 int main(int argc, char *argv[]) {
-    MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
+    MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
     // User-specified Seeds
     std::vector<uint32_t> user_seeds;

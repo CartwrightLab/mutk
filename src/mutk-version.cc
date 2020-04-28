@@ -26,10 +26,10 @@
 #include <iostream>
 #include <mutk/mutk.hpp>
 
-#include "verb.hpp"
+#include "subcommand.hpp"
 
 int main(int /*argc*/, char* /*argv*/[]) {
-    MUTK_VERB_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
+    MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
     std::cout << "MUTK v" MUTK_VERSION << std::endl;
     return EXIT_SUCCESS;
