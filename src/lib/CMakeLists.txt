@@ -39,6 +39,7 @@ target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
 
 target_link_libraries(libmutk PRIVATE doctest::doctest)
 target_link_libraries(libmutk PRIVATE minionrng::minionrng)
+target_link_libraries(libmutk PUBLIC devopt_coverage)
 
 set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
 

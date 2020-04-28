@@ -14,11 +14,13 @@ lcov_dir=$(realpath ./lcov/bin)
 PATH="${PATH}:${lcov_dir}"
 
 # Run lcov
+lcov --directory . --capture --initial --output-file base.info
 lcov --directory . --capture --output-file coverage.info
+lcov --add-tracefile base.info --add-tracefile coverage.info --output-file coverage.info
 lcov --remove coverage.info '/usr/*' '*/leveldb-mcpe/*' '*/tests/*' '*/examples/*' '*/contrib/*' --output-file coverage.info
 
 # Output summary to console
-lcov --list coverage.info 
+lcov --list coverage.info
 
 # Upload report to CodeCov
 #bash <(curl -s https://codecov.io/bash) || echo "CodeCov failed to collect reports."
