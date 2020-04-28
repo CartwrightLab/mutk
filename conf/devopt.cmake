@@ -124,6 +124,7 @@ add_custom_target(check_cppcheck
     --inline-suppr
     --error-exitcode=2
     --quiet
+    --force
     --xml
     "--output-file=${CMAKE_BINARY_DIR}/cppcheck_results.xml"
   BYPRODUCTS
