@@ -44,7 +44,7 @@ add_dependencies(configure-version.h configure-${CMAKE_PROJECT_NAME}.version)
 unset(configure_script_code)
 
 # mutk-version
-add_executable(mutk-version mutk-version.cc)
+add_executable(mutk-version mutk-version.cpp)
 target_link_libraries(mutk-version libmutk)
 install(TARGETS mutk-version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
@@ -52,7 +52,7 @@ clang_format_target(mutk-version)
 clang_tidy_target(mutk-version)
 
 # mutk-genseed
-add_executable(mutk-genseed mutk-genseed.cc)
+add_executable(mutk-genseed mutk-genseed.cpp)
 target_link_libraries(mutk-genseed libmutk)
 target_link_libraries(mutk-genseed minionrng::minionrng)
 install(TARGETS mutk-genseed RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
@@ -62,16 +62,16 @@ clang_tidy_target(mutk-genseed)
 
 # mutk main script
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/mutk.cc.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/mutk.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/mutk.cpp.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/mutk.cpp"
   @ONLY)
-add_executable(mutk "${CMAKE_CURRENT_BINARY_DIR}/mutk.cc")
+add_executable(mutk "${CMAKE_CURRENT_BINARY_DIR}/mutk.cpp")
 target_link_libraries(mutk libmutk)
 install(TARGETS mutk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 ###########################################################
 # Unit Test support
-add_executable(mutk-doctest EXCLUDE_FROM_ALL mutk-doctest.cc)
+add_executable(mutk-doctest EXCLUDE_FROM_ALL mutk-doctest.cpp)
 
 target_link_libraries(mutk-doctest libmutk-doctest doctest::doctest)
 

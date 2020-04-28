@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set(mutk_sources version.cc)
+set(mutk_sources version.cpp)
 set(mutk_headers mutk.hpp)
 
 #####################################################################
