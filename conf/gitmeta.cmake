@@ -1,4 +1,4 @@
-# Copyright (c) 2019 Reed A. Cartwright <reed@cartwright.ht>
+# Copyright (c) 2019-2020 Reed A. Cartwright <reed@cartwright.ht>
 # 
 # This file is part of the Ultimate Source Code Project.
 # 
@@ -42,13 +42,13 @@ elseif(GIT_FOUND)
   set(gitmeta_always "ALWAYS")
   ## script code
   set(configure_script_code "
-if (IS_DIRECTORY \"${the_source_dir}/.git\")
+if (IS_DIRECTORY \"${CMAKE_SOURCE_DIR}/.git\")
   set(GITMETA_BUILT_FROM_GIT TRUE)
   execute_process(
     COMMAND           \"${GIT_EXECUTABLE}\"
                       rev-parse
                       HEAD
-    WORKING_DIRECTORY \"${the_source_dir}\"
+    WORKING_DIRECTORY \"${CMAKE_SOURCE_DIR}\"
     RESULT_VARIABLE   git_return
     OUTPUT_VARIABLE   GITMETA_HASH)
   execute_process(
@@ -56,7 +56,7 @@ if (IS_DIRECTORY \"${the_source_dir}/.git\")
                       rev-parse
                       --short
                       HEAD
-    WORKING_DIRECTORY \"${the_source_dir}\"
+    WORKING_DIRECTORY \"${CMAKE_SOURCE_DIR}\"
     RESULT_VARIABLE   git_return
     OUTPUT_VARIABLE   GITMETA_HASH_SHORT)
   execute_process(
@@ -65,7 +65,7 @@ if (IS_DIRECTORY \"${the_source_dir}/.git\")
                       --no-ext-diff
                       --quiet
                       --exit-code
-    WORKING_DIRECTORY \"${the_source_dir}\"
+    WORKING_DIRECTORY \"${CMAKE_SOURCE_DIR}\"
     RESULT_VARIABLE   git_return)
   if(git_return)
     set(GITMETA_DIRTY 1)

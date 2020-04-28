@@ -91,7 +91,6 @@ function(add_configured_file name)
     COMMENT "Configuring: ${name}"
   )
 
-
   if(NOT add_conf_file_NOTARGET)
     # Custom Target and Properties
     add_custom_target(configure-${name}
