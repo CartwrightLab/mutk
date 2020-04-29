@@ -26,6 +26,7 @@
 #define MUTK_SUBCOMMAND_HPP
 
 #include <iostream>
+#include <string>
 
 #include <mutk/mutk.hpp>
 
@@ -51,6 +52,27 @@ int check_version_number() {
             return check; \
         } \
     } while(false) \
+/*spacer*/
+
+namespace string_literals {
+
+std::string operator"" _opt(const char* p, std::size_t n) {
+    using namespace std::string_literals;
+
+    // setup long argument
+    std::string ret = "--"s;
+    ret.append(p, n);
+    
+    // replace underscores with dashes
+    for(auto &&s : ret) {
+        if(s == '_') {
+            s = '-';
+        }
+    }
+
+    return ret;
+}
+} // namespace string_literals
 
 } // namespace subcommand
 } // namespace mutk

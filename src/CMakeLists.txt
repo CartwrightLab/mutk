@@ -43,24 +43,9 @@ add_configured_file(version.h
 add_dependencies(configure-version.h configure-${CMAKE_PROJECT_NAME}.version)
 unset(configure_script_code)
 
-# mutk-version
-add_executable(mutk-version mutk-version.cpp)
-target_link_libraries(mutk-version libmutk)
-install(TARGETS mutk-version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+#####################################################################
+# mutk binary
 
-clang_format_target(mutk-version)
-clang_tidy_target(mutk-version)
-
-# mutk-genseed
-add_executable(mutk-genseed mutk-genseed.cpp)
-target_link_libraries(mutk-genseed libmutk)
-target_link_libraries(mutk-genseed minionrng::minionrng)
-install(TARGETS mutk-genseed RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
-
-clang_format_target(mutk-genseed)
-clang_tidy_target(mutk-genseed)
-
-# mutk main script
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/mutk.cpp.in"
   "${CMAKE_CURRENT_BINARY_DIR}/mutk.cpp"
@@ -68,6 +53,24 @@ configure_file(
 add_executable(mutk "${CMAKE_CURRENT_BINARY_DIR}/mutk.cpp")
 target_link_libraries(mutk libmutk)
 install(TARGETS mutk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+#####################################################################
+# mutk subcommands
+
+set(mutk_subcommands version genseed modelfit)
+
+foreach(cmd ${mutk_subcommands})
+  add_executable(mutk-${cmd} mutk-${cmd}.cpp)
+  target_link_libraries(mutk-${cmd} libmutk CLI11::CLI11)
+
+  install(TARGETS mutk-${cmd} RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+
+  clang_format_target(mutk-${cmd})
+  clang_tidy_target(mutk-${cmd})  
+endforeach()
+
+# target-specific options
+target_link_libraries(mutk-genseed minionrng::minionrng)
 
 ###########################################################
 # Unit Test support

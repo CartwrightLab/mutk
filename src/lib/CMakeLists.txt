@@ -20,8 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set(mutk_sources version.cpp)
-set(mutk_headers mutk.hpp)
+set(mutk_sources version.cpp call.cpp pedigree.cpp utility.cpp vcf.hpp)
+set(mutk_headers mutk.hpp pedigree.hpp utility.hpp)
 
 #####################################################################
 # libmutk dependencies
