@@ -39,14 +39,15 @@ A6@ploidy=1@founder .     .           1     =
 #ifndef MUTK_PEDIGREE_HPP
 #define MUTK_PEDIGREE_HPP
 
+#include <mutk/utility.hpp>
+
 #include <vector>
 #include <string>
 #include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include <optional>
-
-#include <mutk/utility.hpp>
+#include <filesystem>
 
 namespace mutk {
 
@@ -62,7 +63,10 @@ public:
     template<typename Range>
     static Pedigree parse_text(const Range &text);
 
+    static Pedigree parse_file(const std::filesystem::path &path);
+
     static Pedigree parse_table(const std::vector<std::vector<std::string>> &table);
+
 
     struct Member {
         std::string name;
@@ -193,8 +197,19 @@ Pedigree Pedigree::parse_text(const Range &text) {
     }
 
     return parse_table(string_table);
- }
+}
 
+inline
+Pedigree Pedigree::parse_file(const std::filesystem::path &path) {
+    if(path.empty()) {
+        throw std::invalid_argument("Path to ped file is empty.");
+    }
+    auto text = utility::slurp(path);
+    if(!text) {
+        throw std::runtime_error("Unable to open ped file '" + path.string() + "'.");        
+    }
+    return Pedigree::parse_text(text);
+}
 
 } // namespace mutk
 

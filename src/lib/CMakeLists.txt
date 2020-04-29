@@ -29,9 +29,9 @@ set(mutk_headers mutk.hpp pedigree.hpp utility.hpp)
 find_package(Eigen3)
 find_package(HTSlib)
 
-
 #####################################################################
 # libmutk library
+
 foreach(source IN LISTS mutk_headers)
     list(APPEND mutk_headers_ "${CMAKE_SOURCE_DIR}/src/include/mutk/${source}")
 endforeach()
@@ -46,9 +46,17 @@ target_compile_definitions(libmutk PRIVATE DOCTEST_CONFIG_DISABLE)
 
 target_link_libraries(libmutk PRIVATE doctest::doctest)
 target_link_libraries(libmutk PRIVATE minionrng::minionrng)
+target_link_libraries(libmutk PRIVATE Eigen3::Eigen)
+target_link_libraries(libmutk PRIVATE HTSLIB::HTSLIB)
 target_link_libraries(libmutk PUBLIC devopt_coverage)
 
 set_target_properties(libmutk PROPERTIES OUTPUT_NAME mutk)
+
+clang_format_target(libmutk)
+clang_tidy_target(libmutk)
+
+#####################################################################
+# libmutk doctest
 
 add_library(libmutk-doctest EXCLUDE_FROM_ALL OBJECT ${mutk_sources})
 target_compile_features(libmutk-doctest PUBLIC cxx_std_17)
@@ -63,7 +71,5 @@ target_include_directories(libmutk-doctest INTERFACE
 )
 
 add_dependencies(libmutk-doctest configure-version.h)
-target_link_libraries(libmutk-doctest PUBLIC devopt_coverage)
+#target_link_libraries(libmutk-doctest PUBLIC devopt_coverage)
 
-clang_format_target(libmutk)
-clang_tidy_target(libmutk)

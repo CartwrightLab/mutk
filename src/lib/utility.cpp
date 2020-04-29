@@ -24,6 +24,9 @@
 
 #include <mutk/utility.hpp>
 
+#include <boost/filesystem/convenience.hpp>
+#include <boost/algorithm/string/trim.hpp>
+
 void mutk::utility::detail::percent_decode_core(std::string *str, size_t start) {
     assert(str != nullptr);
     assert((*str)[start] == '%');
@@ -64,4 +67,79 @@ void mutk::utility::detail::percent_decode_core(std::string *str, size_t start) 
         }
     } while(p != str->end());
     str->erase(q,str->end());
+}
+
+// extracts extension and filename from both file.ext and ext:file.foo
+// trims whitespace as well
+mutk::utility::file_type_t mutk::utility::extract_file_type(std::string path) {
+    using boost::algorithm::trim;
+    using boost::algorithm::ends_with;
+    const auto &npos = std::string::npos;
+
+    auto is_compressed = [](const std::string &path) -> std::string {
+        for(auto && s : {".gz", ".gzip", ".bgz"}) {
+            if(ends_with(path, s)) {
+                return {s+1};
+            }
+        }
+        return {};
+    };
+
+    // Remove whitespace
+    trim(path);
+
+    // Format ext:path ???
+    auto colon = path.find_first_of(':');
+    if(colon != npos) {
+        auto ext = path.substr(0, colon);
+        path.erase(0,colon+1);
+        // Format ext.gz:path ???
+        auto gz = is_compressed('.'+ext);
+        if(!gz.empty()) {
+            // Format gz:path
+            if(gz.size() == ext.size()) {
+                ext.erase();
+            } else {
+                auto gz_pos = ext.size() - (gz.size()+1);
+                ext.erase(gz_pos);
+            }
+        }
+        return {path, ext, gz};
+    }
+    // Format path.gz ???
+    auto gz = is_compressed(path);
+    auto gz_pos = path.size() - (gz.empty() ? 0 : gz.size()+1);
+    auto ext_pos = path.find_last_of('.', gz_pos-1);
+    if(ext_pos == npos || ext_pos == 0) {
+        return {path, {}, gz};
+    }
+    auto ext = path.substr(ext_pos+1, gz_pos-(ext_pos+1));
+    return {path, ext, gz};
+}
+
+bool mutk::utility::File::Open(const std::string &filename, std::ios_base::openmode mode) {
+    auto file_type = utility::extract_file_type(filename);
+    path_ = file_type.path;
+    type_label_ = file_type.type_ext;
+    compression_ = file_type.compress_ext;
+
+    if(path_.empty()) {
+        // don't do anything, just setup type
+    } else if(path_ != "-") {
+        // if path is not "-" open a file
+        buffer_.reset(new std::filebuf);
+        std::filebuf *p = static_cast<std::filebuf*>(buffer_.get());
+        p->open(path_.c_str(), mode);
+        // if file is open, associate it with the stream
+        if(p->is_open()) {
+            return Attach(buffer_.get());
+        }
+    } else if((mode & std::ios_base::in) == (mode & std::ios_base::out)) {
+        // can't do anything if both are set or none are set
+    } else if(mode & std::ios_base::in) {
+        return Attach(std::cin.rdbuf());
+    } else {
+        return Attach(std::cout.rdbuf());
+    }
+    return Attach(nullptr);
 }

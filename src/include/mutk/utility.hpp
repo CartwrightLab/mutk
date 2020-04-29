@@ -25,7 +25,10 @@
 #ifndef MUTK_UTILITY_HPP
 #define MUTK_UTILITY_HPP
 
-#include<string>
+#include <string>
+#include <filesystem>
+#include <iostream>
+#include <fstream>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/tokenizer.hpp>
@@ -119,6 +122,116 @@ std::string percent_decode(std::string str) {
         detail::percent_decode_core(&str, pos);
     }
     return std::move(str);
+}
+
+// extracts extension and filename from both file.foo and ext:file.foo
+struct file_type_t {
+    std::string path;
+    std::string type_ext;
+    std::string compress_ext;
+};
+
+// returns {ext, file.foo}
+// trims whitespace as well
+file_type_t extract_file_type(std::string path);
+
+// wrapper for input files that might be either a file or stdin
+class File {
+public:
+    File() = default;
+    
+    File(File&& other);
+
+    File& operator=(File&& other);
+
+    explicit File(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in) {
+        Open(filename, mode);
+    }
+
+    bool Open(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in);
+
+    bool Attach(std::streambuf *buffer) {
+        stream_.rdbuf(buffer);
+        stream_.unsetf(std::ios_base::skipws);
+        return is_open();
+    }
+
+    bool is_open() const { return stream_.rdbuf() != nullptr; }
+    operator bool() const { return is_open(); }
+
+    std::string path() const { return path_.native(); }
+
+protected:
+    std::iostream stream_{nullptr};
+    std::filesystem::path path_;
+    std::string type_label_;
+    std::string compression_;
+
+private:
+    std::unique_ptr<std::streambuf> buffer_;    
+};
+
+inline
+File::File(File&& other) : 
+    buffer_{std::move(other.buffer_)},
+    path_{std::move(other.path_)},
+    type_label_{std::move(other.type_label_)}
+{
+    std::streambuf *buffer = other.stream_.rdbuf();
+    Attach(buffer);
+    other.Attach(nullptr);
+} 
+
+inline
+File& File::operator=(File&& other) {
+    if(this == &other) {
+        return *this;
+    }
+
+    buffer_ = std::move(other.buffer_);
+    path_ = std::move(other.path_);
+    type_label_ = std::move(other.type_label_);
+
+    std::streambuf *buffer = other.stream_.rdbuf();
+    Attach(buffer);
+    other.Attach(nullptr);
+
+    return *this;
+}
+
+class BinaryFile : public File {
+public:
+    BinaryFile() = default;
+
+    BinaryFile(BinaryFile&&) = default;
+    BinaryFile& operator=(BinaryFile&&) = default;
+    
+    explicit BinaryFile(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in) {
+        Open(filename, mode);
+    }
+
+    void Open(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in) {
+        File::Open(filename, mode | std::ios::binary);
+    }
+};
+
+template<typename X, typename T = std::char_traits<X>, typename A = std::allocator<X>>
+inline
+std::optional<std::basic_string<X,T,A>> slurp(std::basic_ifstream<X,T>& input) {
+    std::basic_string<X,T,A> ret;
+    if(!input) {
+        return std::nullopt;
+    }
+    input.seekg(0, std::ios::end);
+    ret.resize(input.tellg());
+    input.seekg(0, std::ios::beg);
+    input.read(&ret[0], ret.size());
+    return ret;
+}
+
+inline std::optional<std::string> slurp(const std::filesystem::path& path, std::ios_base::openmode mode = std::ios_base::in) {
+    std::ifstream in{path,mode};
+    return slurp(in);
 }
 
 } // namespace utility

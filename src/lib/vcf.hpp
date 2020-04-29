@@ -24,8 +24,11 @@ SOFTWARE.
 
 #include <htslib/vcf.h>
 #include <htslib/vcfutils.h>
+#include <htslib/synced_bcf_reader.h>
+
 #include <chrono>
 #include <memory>
+#include <vector>
 
 namespace mutk {
 
@@ -61,6 +64,10 @@ class BcfReader {
     }
 
     const bcf_hdr_t *header() const { return header_.get(); }
+
+    std::pair<const char *const*, int> samples() const {
+        return {header()->samples, bcf_hdr_nsamples(header())};
+    }
 
     template <typename callback_t>
     void operator()(callback_t callback);
