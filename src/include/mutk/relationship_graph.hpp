@@ -36,70 +36,7 @@
 
 #include <dng/peeling.h>
 
-#include <boost/graph/adjacency_list.hpp>
-
-// Install boost graph properties
-namespace boost {
-enum edge_length_t { edge_length };
-enum edge_type_t { edge_type };
-enum vertex_sex_t { vertex_sex };
-enum vertex_ploidy_t {vertex_ploidy };
-enum vertex_label_t { vertex_label };
-enum vertex_library_label_t { vertex_library_label };
-enum vertex_type_t { vertex_type };
-
-enum edge_family_t { edge_family };
-enum vertex_group_t { vertex_group };
-
-BOOST_INSTALL_PROPERTY(edge, length);
-BOOST_INSTALL_PROPERTY(edge, type);
-BOOST_INSTALL_PROPERTY(vertex, sex);
-BOOST_INSTALL_PROPERTY(vertex, ploidy);
-BOOST_INSTALL_PROPERTY(vertex, label);
-BOOST_INSTALL_PROPERTY(vertex, library_label);
-BOOST_INSTALL_PROPERTY(vertex, type);
-
-BOOST_INSTALL_PROPERTY(edge, family);
-BOOST_INSTALL_PROPERTY(vertex, group);
-}
-
 namespace mutk {
-namespace detail {
-namespace graph {
-
-enum struct EdgeType : std::size_t {
-    Spousal, Maternal, Paternal, Mitotic
-};
-enum struct VertexType : std::size_t {
-    Germline, Somatic
-};
-using Sex = dng::Pedigree::Sex;
-
-typedef boost::property<boost::vertex_group_t, std::size_t> VertexGroupProp;
-typedef boost::property<boost::vertex_library_label_t, std::string, VertexGroupProp> VertexLibraryLabelProp;
-typedef boost::property<boost::vertex_ploidy_t, int, VertexLibraryLabelProp> VertexPloidyProp;
-typedef boost::property<boost::vertex_sex_t, Sex, VertexPloidyProp> VertexSexProp;
-typedef boost::property<boost::vertex_type_t, VertexType,VertexSexProp> VertexTypeProp;
-typedef boost::property<boost::vertex_label_t, std::string, VertexTypeProp> VertexLabelProp;
-
-typedef boost::property<boost::edge_family_t, std::size_t> EdgeFamilyProp;
-typedef boost::property<boost::edge_length_t, float, EdgeFamilyProp>
-    EdgeLengthProp;
-typedef boost::property<boost::edge_type_t, EdgeType, EdgeLengthProp>
-    EdgeTypeProp;
-typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
-        VertexLabelProp, EdgeTypeProp> Graph;
-
-typedef boost::graph_traits<Graph>::vertex_descriptor vertex_t;
-typedef boost::graph_traits<Graph>::edge_descriptor edge_t;
-
-static_assert(std::is_integral<vertex_t>::value,
-    "vertex_t is not an integral type, this violates many assumptions that have been made.");
-
-bool parse_newick(const std::string &text, vertex_t root, Graph &graph, bool normalize);
-
-} // namespace mutk::detail::graph
-} // namespace mutk::detail
 
 enum struct InheritanceModel {
     Autosomal,    // default option
@@ -130,29 +67,19 @@ public:
 
     using family_labels_t = std::vector<std::vector<boost::graph_traits<detail::graph::Graph>::edge_descriptor>>;
 
-    enum struct TransitionType {
-        Founder, Pair, Trio
-    };
-
     struct transition_t {
-        TransitionType type;
-        std::size_t parent1;
-        std::size_t parent2;
-        double length1;
-        double length2;
+        using parent_t = std::pair<unsigned int, float>;
+        std::optional<parent_t> parent1;
+        std::optional<parent_t> parent2;
 
         bool is_germline;
         bool is_somatic;
     };
+    using samples_t = std::vector<const char*>;
 
-    bool Construct(const Pedigree& pedigree, const libraries_t& libs,
+    bool Construct(const Pedigree& pedigree, const samples_t& known_samples,
             InheritanceModel inheritance_model,
-            double mu, double mu_somatic, double mu_library,
-            bool normalize_somatic_trees);
-
-    bool Construct(const Pedigree& pedigree, const libraries_t& libs,
-            double mu, double mu_somatic, double mu_library,
-            bool normalize_somatic_trees);
+            double mu, double mu_somatic, bool normalize_somatic_trees);
 
     double PeelForwards(peel::workspace_t &work,
                         const TransitionMatrixVector &mat) const {

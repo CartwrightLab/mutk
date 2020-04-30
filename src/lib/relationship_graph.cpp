@@ -24,17 +24,75 @@
 # SOFTWARE.
 */
 
+#include <mutk/relationship_graph.hpp>
+
 #include <queue>
 
+#include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/biconnected_components.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/range/algorithm/find.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 
-#include <mutk/relationship_graph.hpp>
+
+// Install boost graph properties
+namespace boost {
+enum edge_length_t { edge_length };
+enum edge_type_t { edge_type };
+enum vertex_sex_t { vertex_sex };
+enum vertex_ploidy_t {vertex_ploidy };
+enum vertex_label_t { vertex_label };
+enum vertex_library_label_t { vertex_library_label };
+enum vertex_type_t { vertex_type };
+
+enum edge_family_t { edge_family };
+enum vertex_group_t { vertex_group };
+
+BOOST_INSTALL_PROPERTY(edge, length);
+BOOST_INSTALL_PROPERTY(edge, type);
+BOOST_INSTALL_PROPERTY(vertex, sex);
+BOOST_INSTALL_PROPERTY(vertex, ploidy);
+BOOST_INSTALL_PROPERTY(vertex, label);
+BOOST_INSTALL_PROPERTY(vertex, library_label);
+BOOST_INSTALL_PROPERTY(vertex, type);
+
+BOOST_INSTALL_PROPERTY(edge, family);
+BOOST_INSTALL_PROPERTY(vertex, group);
+}
 
 namespace {
+
+enum struct EdgeType : std::size_t {
+    Spousal, Maternal, Paternal, Mitotic
+};
+enum struct VertexType : std::size_t {
+    Germline, Somatic
+};
+using Sex = mutk::Pedigree::Sex;
+
+using VertexGroupProp = boost::property<boost::vertex_group_t, std::size_t>;
+using VertexLibraryLabelProp =  boost::property<boost::vertex_library_label_t, std::string, VertexGroupProp>;
+using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, int, VertexLibraryLabelProp>;
+using VertexSexProp = boost::property<boost::vertex_sex_t, Sex, VertexPloidyProp>;
+using VertexTypeProp = boost::property<boost::vertex_type_t, VertexType,VertexSexProp>;
+using VertexLabelProp = boost::property<boost::vertex_label_t, std::string, VertexTypeProp>;
+
+using EdgeFamilyProp = boost::property<boost::edge_family_t, std::size_t>;
+using EdgeLengthProp = boost::property<boost::edge_length_t, float, EdgeFamilyProp>;
+using EdgeTypeProp = boost::property<boost::edge_type_t, EdgeType, EdgeLengthProp>;
+
+using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
+        VertexLabelProp, EdgeTypeProp>;
+
+using vertex_t = boost::graph_traits<Graph>::vertex_descriptor vertex_t;
+using edge_t = boost::graph_traits<Graph>::edge_descriptor;
+
+static_assert(std::is_integral<vertex_t>::value,
+    "vertex_t is not an integral type, this violates many assumptions that have been made.");
+
+using samples_t = mutk::RelationshipGraph::samples_t;
+
 using Graph = mutk::detail::graph::Graph;
 using vertex_t = mutk::detail::graph::vertex_t;
 using InheritanceModel = mutk::InheritanceModel;
@@ -43,7 +101,9 @@ using Pedigree = mutk::Pedigree;
 std::pair<vertex_t,vertex_t> parse_pedigree_table(Graph &pedigree_graph, const Pedigree &pedigree,
         bool normalize_somatic_trees);
 
-void add_libraries_to_graph(Graph &pedigree_graph, const libraries_t &libs);
+bool parse_newick(const std::string &text, int root, Graph *graph, bool normalize);
+
+void add_samples_to_graph(Graph &pedigree_graph, const libraries_t &libs);
 void update_edge_lengths(Graph &pedigree_graph,
         double mu_meiotic, double mu_somatic, double mu_library);
 void simplify_pedigree(Graph &pedigree_graph);
@@ -96,14 +156,7 @@ std::string mutk::to_string(InheritanceModel model) {
 }
 
 bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
-        const libraries_t& libs, double mu, double mu_somatic, double mu_library,
-        bool normalize_somatic_trees) {
-    return Construct(pedigree, libs, InheritanceModel::Autosomal, mu,
-                     mu_somatic, mu_library, normalize_somatic_trees);
-}
-
-bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
-        const libraries_t& libs, InheritanceModel model,
+        const samples_t& known_samples, InheritanceModel model,
         double mu, double mu_somatic, double mu_library,
         bool normalize_somatic_trees) {
     using namespace std;
@@ -205,13 +258,13 @@ std::vector<std::string> dng::RelationshipGraph::BCFHeaderLines() const {
         "##META=<ID=MotherMR,Type=Float,Number=1,Description=\"Maternal mutation rate\">",
         "##META=<ID=Ploidy,Type=Integer,Number=1,Description=\"Ploidy\">",
         "##META=<ID=Germline,Type=Flag,Number=0,Description=\"Contains germline events\">",
-        "##META=<ID=Somatic,Type=Flag,Number=0,Description=\"Contains somatic events\">",
-        "##META=<ID=Library,Type=Flag,Number=0,Description=\"Contains library events\">"
+        "##META=<ID=Somatic,Type=Flag,Number=0,Description=\"Contains somatic events\">"
     };
 
     for(size_t child = 0; child != transitions_.size(); ++child) {
         auto & parents = transitions_[child];
         string line;
+
         switch(parents.type) {
         case TransitionType::Trio:
             line += "##PEDIGREE=<Child=" + labels_[child];
@@ -442,7 +495,7 @@ void prune_pedigree_paternal(Graph &pedigree_graph) {
 }
 
 std::pair<vertex_t,vertex_t> parse_pedigree_table(Graph &pedigree_graph,
-        const dng::Pedigree &pedigree, bool normalize_somatic_trees) {
+        const Pedigree &pedigree, bool normalize_somatic_trees) {
 
     using namespace std;
     using Sex = dng::Pedigree::Sex;
@@ -475,7 +528,6 @@ std::pair<vertex_t,vertex_t> parse_pedigree_table(Graph &pedigree_graph,
     };
     auto get_ploidy = [](const Pedigree::Member &member) -> int {
         using boost::algorithm::iequals;
-        using boost::algorithm::istarts_with;
         for(auto &&a : member.tags) {
             if(iequals(a, "haploid") || iequals(a, "gamete")
                 || iequals(a, "p=1") || iequals(a, "ploidy=1")) {
@@ -611,7 +663,7 @@ std::pair<vertex_t,vertex_t> parse_pedigree_table(Graph &pedigree_graph,
     auto ploidies  = get(boost::vertex_ploidy, pedigree_graph);
 
     // structure to hold parents on first visit
-    vector<boost::optional<vertex_t>> touched(pedigree_children.size());
+    vector<std::optional<vertex_t>> touched(pedigree_children.size());
     
     // map id -> vertex_t
     vector<vertex_t> vertices(pedigree_children.size());
@@ -707,13 +759,14 @@ std::pair<vertex_t,vertex_t> parse_pedigree_table(Graph &pedigree_graph,
     return {founders.size(),counter};
 }
 
-void add_libraries_to_graph(Graph &pedigree_graph, const libraries_t &libs) {
+void add_samples_to_graph(Graph &pedigree_graph, const samples_t &known_samples) {
     auto sexes  = get(boost::vertex_sex, pedigree_graph);
     auto ploidies  = get(boost::vertex_ploidy, pedigree_graph);
     auto labels = get(boost::vertex_label, pedigree_graph);
     auto types  = get(boost::vertex_type, pedigree_graph);
     auto library_labels = get(boost::vertex_library_label, pedigree_graph);
 
+    // Create a label-to-id map
     std::map<std::string, vertex_t> soma;
     auto vertex_range = boost::make_iterator_range(vertices(pedigree_graph));
     for(vertex_t v : vertex_range) {

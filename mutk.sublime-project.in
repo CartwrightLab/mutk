@@ -15,7 +15,8 @@
             {"file": "CMakeLists.txt"}
         ],
         "ecc_header_to_source_mapping": [
-            "./", "../", "../../", "../src/", "../lib/", "../../lib/"
+            "./{stamp}.cpp", "../../lib/{stamp}.cpp",
+            "./", "../../lib/", "../.."
         ]
 	},
     "SublimeLinter": {
