@@ -26,6 +26,7 @@ SOFTWARE.
 #include <htslib/vcfutils.h>
 #include <htslib/synced_bcf_reader.h>
 
+#include <filesystem>
 #include <chrono>
 #include <memory>
 #include <vector>
@@ -52,10 +53,10 @@ struct bcf_free_t {
 
 class BcfReader {
    public:
-    explicit BcfReader(const char *path) {
-        input_.reset(hts_open(path, "r"));
+    explicit BcfReader(const std::filesystem::path &path) {
+        input_.reset(hts_open(path.string().c_str(), "r"));
         if(!input_) {
-            throw std::runtime_error(std::string{"unable to open input file: '"} + path + "'.");
+            throw std::runtime_error("unable to open input file: '" + path.string() + "'.");
         }
         header_.reset(bcf_hdr_read(input_.get()));
         if(!header_) {

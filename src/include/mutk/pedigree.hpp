@@ -208,7 +208,7 @@ Pedigree Pedigree::parse_file(const std::filesystem::path &path) {
     if(!text) {
         throw std::runtime_error("Unable to open ped file '" + path.string() + "'.");        
     }
-    return Pedigree::parse_text(text);
+    return Pedigree::parse_text(*text);
 }
 
 } // namespace mutk

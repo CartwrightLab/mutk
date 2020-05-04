@@ -1,4 +1,4 @@
-# Copyright (c) 2019 Reed A. Cartwright <reed@cartwright.ht>
+# Copyright (c) 2020 Reed A. Cartwright <reed@cartwright.ht>
 # 
 # This file is part of the Ultimate Source Code Project.
 # 
@@ -57,7 +57,9 @@ install(TARGETS mutk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 #####################################################################
 # mutk subcommands
 
-set(mutk_subcommands version genseed modelfit)
+set(mutk_subcommands version genseed modelfit
+  #graph
+  )
 
 foreach(cmd ${mutk_subcommands})
   add_executable(mutk-${cmd} mutk-${cmd}.cpp)

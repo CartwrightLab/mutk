@@ -26,5 +26,4 @@
 
 #include <mutk/mutk.hpp>
 
-#include "vcf.hpp"
 

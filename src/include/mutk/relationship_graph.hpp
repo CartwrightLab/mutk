@@ -27,14 +27,14 @@
 #ifndef MUTK_RELATIONSHIP_GRAPH_HPP
 #define MUTK_RELATIONSHIP_GRAPH_HPP
 
+#include <mutk/detail/graph.hpp>
 #include <mutk/pedigree.hpp>
 #include <mutk/memory.hpp>
+#include <mutk/peeling.hpp>
 
 #include <cmath>
 #include <string>
 #include <vector>
-
-#include <dng/peeling.h>
 
 namespace mutk {
 
@@ -49,23 +49,27 @@ enum struct InheritanceModel {
     Invalid
 };
 
+namespace detail {
+extern const std::map<std::string, InheritanceModel> CHR_MODEL_MAP;
+} //namespace detail
+
 InheritanceModel inheritance_model(const std::string &pattern);
 
 std::string to_string(InheritanceModel model);
 
 class RelationshipGraph {
 public:
-    template<typename T>
-    using property_t = typename boost::property_map<detail::graph::Graph, T>::type;
-    using PropEdgeType = property_t<boost::edge_type_t>; 
-    using PropEdgeLength = property_t<boost::edge_length_t>;
-    using PropVertexLabel = property_t<boost::vertex_label_t>;
-    using PropVertexGroup = property_t<boost::vertex_group_t>;
-    using PropVertexIndex = property_t<boost::vertex_index_t>;
-    using PropVertexSex = property_t<boost::vertex_sex_t>;
-    using IndexMap = property_t<boost::vertex_index_t>;
+    // template<typename T>
+    // using property_t = typename boost::property_map<detail::graph::Graph, T>::type;
+    // using PropEdgeType = property_t<boost::edge_type_t>; 
+    // using PropEdgeLength = property_t<boost::edge_length_t>;
+    // using PropVertexLabel = property_t<boost::vertex_label_t>;
+    // using PropVertexGroup = property_t<boost::vertex_group_t>;
+    // using PropVertexIndex = property_t<boost::vertex_index_t>;
+    // using PropVertexSex = property_t<boost::vertex_sex_t>;
+    // using IndexMap = property_t<boost::vertex_index_t>;
 
-    using family_labels_t = std::vector<std::vector<boost::graph_traits<detail::graph::Graph>::edge_descriptor>>;
+    // using family_labels_t = std::vector<std::vector<boost::graph_traits<detail::graph::Graph>::edge_descriptor>>;
 
     struct transition_t {
         using parent_t = std::pair<unsigned int, float>;
@@ -81,55 +85,55 @@ public:
             InheritanceModel inheritance_model,
             double mu, double mu_somatic, bool normalize_somatic_trees);
 
-    double PeelForwards(peel::workspace_t &work,
-                        const TransitionMatrixVector &mat) const {
-        if(work.dirty_lower) {
-            work.CleanupFast();
-        }
+    // double PeelForwards(peel::workspace_t &work,
+    //                     const TransitionMatrixVector &mat) const {
+    //     if(work.dirty_lower) {
+    //         work.CleanupFast();
+    //     }
 
-        // Peel pedigree one family at a time
-        for(std::size_t i = 0; i < peeling_functions_.size(); ++i) {
-            (*peeling_functions_[i])(work, family_members_[i], mat);
-        }
+    //     // Peel pedigree one family at a time
+    //     for(std::size_t i = 0; i < peeling_functions_.size(); ++i) {
+    //         (*peeling_functions_[i])(work, family_members_[i], mat);
+    //     }
 
-        // Sum over roots
-        double ret = 0.0;
-        for(auto r : roots_) {
-            ret += log((work.lower[r] * work.upper[r]).sum());
-        }
+    //     // Sum over roots
+    //     double ret = 0.0;
+    //     for(auto r : roots_) {
+    //         ret += log((work.lower[r] * work.upper[r]).sum());
+    //     }
         
-        return ret;
-    }
+    //     return ret;
+    // }
 
-    double PeelBackwards(peel::workspace_t &work,
-                         const TransitionMatrixVector &mat) const {
-        double ret = 0.0;
-        // Divide by the likelihood
-        for(auto r : roots_) {
-            double sum = (work.lower[r] * work.upper[r]).sum();
-            ret += log(sum);
-            work.lower[r] /= sum;
-        }
+    // double PeelBackwards(peel::workspace_t &work,
+    //                      const TransitionMatrixVector &mat) const {
+    //     double ret = 0.0;
+    //     // Divide by the likelihood
+    //     for(auto r : roots_) {
+    //         double sum = (work.lower[r] * work.upper[r]).sum();
+    //         ret += log(sum);
+    //         work.lower[r] /= sum;
+    //     }
 
-        for(std::size_t i = peeling_reverse_functions_.size(); i > 0; --i) {
-            (*peeling_reverse_functions_[i - 1])(work, family_members_[i - 1], mat);
-        }
-        work.dirty_lower = true;
-        return ret;
-    }
+    //     for(std::size_t i = peeling_reverse_functions_.size(); i > 0; --i) {
+    //         (*peeling_reverse_functions_[i - 1])(work, family_members_[i - 1], mat);
+    //     }
+    //     work.dirty_lower = true;
+    //     return ret;
+    // }
 
-    peel::workspace_t CreateWorkspace() const {
-        peel::workspace_t work;
-        work.Resize(num_nodes_);
-        work.founder_nodes = std::make_pair(first_founder_, first_nonfounder_);
-        work.germline_nodes = std::make_pair(first_founder_, first_somatic_);
-        work.somatic_nodes = std::make_pair(first_somatic_, first_library_);
-        work.library_nodes = std::make_pair(first_library_, num_nodes_);
+    // peel::workspace_t CreateWorkspace() const {
+    //     peel::workspace_t work;
+    //     work.Resize(num_nodes_);
+    //     work.founder_nodes = std::make_pair(first_founder_, first_nonfounder_);
+    //     work.germline_nodes = std::make_pair(first_founder_, first_somatic_);
+    //     work.somatic_nodes = std::make_pair(first_somatic_, first_library_);
+    //     work.library_nodes = std::make_pair(first_library_, num_nodes_);
 
-        work.ploidies = ploidies_;
+    //     work.ploidies = ploidies_;
 
-        return work;
-    }
+    //     return work;
+    // }
 
     std::vector<std::string> BCFHeaderLines() const;
 
@@ -147,9 +151,6 @@ public:
     const std::vector<std::string> &library_names() const { return library_names_; }
 
 protected:
-    using Graph = dng::detail::graph::Graph;
-    using vertex_t = dng::detail::graph::vertex_t;
-
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 
     // node structure:
@@ -167,13 +168,13 @@ protected:
     std::vector<int> ploidies_;
     std::vector<transition_t> transitions_;
 
-    // The original, simplified peeling operations
-    std::vector<peel::Op> peeling_ops_;
-    // The modified, "faster" operations
-    std::vector<peel::Op> peeling_functions_ops_;
-    // Array of functions that will be called to perform the peeling
-    std::vector<peel::function_t> peeling_functions_;
-    std::vector<peel::function_t> peeling_reverse_functions_;
+    // // The original, simplified peeling operations
+    // std::vector<peel::Op> peeling_ops_;
+    // // The modified, "faster" operations
+    // std::vector<peel::Op> peeling_functions_ops_;
+    // // Array of functions that will be called to perform the peeling
+    // std::vector<peel::function_t> peeling_functions_;
+    // std::vector<peel::function_t> peeling_reverse_functions_;
 
     // The arguments to a peeling operation
     std::vector<peel::family_members_t> family_members_;

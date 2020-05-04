@@ -34,12 +34,65 @@
 #include <boost/range/algorithm/fill.hpp>
 #include <boost/range/algorithm/fill_n.hpp>
 
-
-#include <dng/genotyper.h>
-
 #include <boost/range/adaptor/sliced.hpp>
 
 namespace mutk {
+
+struct workspace_t;
+
+/* Peeling Operators
+PeelUp:       low[o] = mat %*% low[a]
+PeelUpStar:   low[o] = (mat %*% low[a])*low[b]
+PeelDown:     upp[o] = mat  %*% upp[a]
+PeelStar:     upp[o] = upp[a] * low[b]
+PeelMate:     low[o] = reshaped[low[a]] %*% upp[b]
+*/
+
+class PeelOp {
+public:
+    PeelOp(int o, int a, int b) :
+        output_{o}, a_{a}, b_{b}
+    {}
+
+    virtual void operator()(workspace_t *work, const TransitionMatrix &mat) const = 0;
+
+    // Node indexes
+    int output_;
+    int a_;
+    int b_;
+};
+
+class PeelUp : public PeelOp {
+public:
+    PeelUp(int o, int a) :
+    PeelOp{o, a, -1} {}
+    virtual void operator()(workspace_t *work, const TransitionMatrix &mat) const final;
+};
+
+class PeelUpStar : public PeelOp {
+public:
+    using PeelOp::PeelOp;
+    virtual void operator()(workspace_t *work, const TransitionMatrix &mat) const final;
+};
+
+class PeelDown : public PeelOp {
+public:
+    using PeelOp::PeelOp;
+    virtual void operator()(workspace_t *work, const TransitionMatrix &mat) const final;
+};
+
+class PeelStar : public PeelOp {
+public:
+    using PeelOp::PeelOp;
+    virtual void operator()(workspace_t *work, const TransitionMatrix &mat) const final;
+};
+
+class PeelMate : public PeelOp {
+public:
+    using PeelOp::PeelOp;
+    virtual void operator()(workspace_t *work, const TransitionMatrix &mat) const final;
+};
+
 
 struct workspace_t {
     GenotypeArrayVector upper; // Holds P(~Descendent_Data & G=g)
@@ -217,126 +270,6 @@ struct workspace_t {
     }   
 };
 
-/* Peeling Operators
-PeelUp:       low[o] = mat %*% low[a]
-PeelUpStar:   low[o] = (mat %*% low[a])*low[b]
-PeelDown:     upp[o] = mat  %*% upp[a]
-PeelStar:     upp[o] = upp[a] * low[b]
-PeelMate:     low[o] = upp[a] %*% reshaped[low[b]]
-*/
+} // namespace MUTK
 
-
-class PeelOp {
-public:
-    PeelOp(int o, int a, int b, TransitionMatrix mat) :
-        output_{o}, a_{a}, b_{b}, mat_{std::move(mat)}
-    {}
-
-    virtual void operator()(workspace_t *work) const = 0;
-
-    // Node indexes
-    int output_;
-    int a_;
-    int b_;
-
-    TransitionMatrix mat_;
-};
-
-class PeelUp : public PeelOp {
-public:
-    PeelUp(int o, int a, TransitionMatrix mat) :
-    PeelOp{o, a, -1, std::move(mat)} {}
-    virtual void operator()(workspace_t *work) const final;
-};
-
-class PeelUpStar : public PeelOp {
-public:
-    using PeelOp::PeelOp;
-    virtual void operator()(workspace_t *work) const final;
-};
-
-class PeelDown : public PeelOp {
-public:
-    PeelDown(int o, int a, int b, TransitionMatrix mat) :
-    PeelOp{o, a, b, std::move(mat)} {
-        mat.transposeInPlace();
-    }
-    virtual void operator()(workspace_t *work) const final;
-};
-
-void to_father(workspace_t &work, const family_members_t &family,
-               const TransitionMatrixVector &mat);
-void to_mother(workspace_t &work, const family_members_t &family,
-               const TransitionMatrixVector &mat);
-void to_child(workspace_t &work, const family_members_t &family,
-              const TransitionMatrixVector &mat);
-
-// Fast versions that can be used on "dirty" workspaces
-void up_fast(workspace_t &work, const family_members_t &family,
-             const TransitionMatrixVector &mat);
-void down_fast(workspace_t &work, const family_members_t &family,
-               const TransitionMatrixVector &mat);
-void to_father_fast(workspace_t &work, const family_members_t &family,
-                    const TransitionMatrixVector &mat);
-void to_mother_fast(workspace_t &work, const family_members_t &family,
-                    const TransitionMatrixVector &mat);
-void to_child_fast(workspace_t &work, const family_members_t &family,
-                   const TransitionMatrixVector &mat);
-
-// Reverse versions that can be used for backwards algorithms
-void up_reverse(workspace_t &work, const family_members_t &family,
-                const TransitionMatrixVector &mat);
-void down_reverse(workspace_t &work, const family_members_t &family,
-                  const TransitionMatrixVector &mat);
-void to_father_reverse(workspace_t &work, const family_members_t &family,
-                       const TransitionMatrixVector &mat);
-void to_mother_reverse(workspace_t &work, const family_members_t &family,
-                       const TransitionMatrixVector &mat);
-void to_child_reverse(workspace_t &work, const family_members_t &family,
-                      const TransitionMatrixVector &mat);
-
-typedef decltype(&down) function_t;
-
-struct info_t {
-    bool writes_lower;
-    int writes_to;
-};
-
-enum struct Op { 
-    UP=0, DOWN, TOFATHER, TOMOTHER, TOCHILD,
-    UPFAST, DOWNFAST, TOFATHERFAST, TOMOTHERFAST,
-    TOCHILDFAST,
-    NUM // Total number of possible forward operations
-};
-
-constexpr info_t info[(int)Op::NUM] = {
-    /* Up           */ {true,  0},
-    /* Down         */ {false, 1},
-    /* ToFather     */ {true,  0},
-    /* ToMother     */ {true,  1},
-    /* ToChild      */ {false, 2},
-    /* UpFast       */ {true,  0},
-    /* DownFast     */ {false, 1},
-    /* ToFatherFast */ {true,  0},
-    /* ToMotherFast */ {true,  1},
-    /* ToChildFast  */ {false, 2}
-};
-
-// TODO: Write test case to check that peeling ops are in the right order.
-constexpr function_t functions[(int)Op::NUM] = {
-    &up, &down, &to_father, &to_mother, &to_child,
-    &up_fast, &down_fast, &to_father_fast, &to_mother_fast,
-    &to_child_fast
-};
-
-constexpr function_t reverse_functions[(int)Op::NUM] = {
-    &up_reverse, &down_reverse, &to_father_reverse,
-    &to_mother_reverse, &to_child_reverse,
-    &up_reverse, &down_reverse, &to_father_reverse,
-    &to_mother_reverse, &to_child_reverse
-};
-
-} // namespace dng::peel
-} // namespace dng
-
-#endif // DNG_PEELING_H
+#endif // MUTK_PEELING_HPP
