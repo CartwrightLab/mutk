@@ -58,7 +58,7 @@ install(TARGETS mutk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 # mutk subcommands
 
 set(mutk_subcommands version genseed modelfit
-  #graph
+  graph
   )
 
 foreach(cmd ${mutk_subcommands})

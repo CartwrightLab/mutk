@@ -64,7 +64,7 @@ enum EdgeType : int {
     SOMA_EDGE = 0x2,
 };
 
-enum struct VertexType : std::size_t {
+enum struct VertexType : int {
     Founder, Germline, Somatic, Sample
 };
 
@@ -78,42 +78,33 @@ using EdgeTypeProp = boost::property<boost::edge_type_t, EdgeType>;
 using EdgeLengthProp = boost::property<boost::edge_length_t, float, EdgeTypeProp>;
 using EdgeProp = EdgeLengthProp;
 
-using VertexColorProp = boost::property<boost::vertex_color_t, boost::default_color_type>;
-using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, int, VertexColorProp>;
+using VertexTypeProp = boost::property<boost::vertex_type_t, VertexType>;
+using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, int, VertexTypeProp>;
 using VertexSexProp = boost::property<boost::vertex_sex_t, Sex, VertexPloidyProp>;
 using VertexLabelProp = boost::property<boost::vertex_label_t, std::string, VertexSexProp>;
 using VertexProp = VertexLabelProp;
 
-using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
+using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
         VertexProp, EdgeProp>;
 using vertex_t = boost::graph_traits<Graph>::vertex_descriptor;
 using edge_t = boost::graph_traits<Graph>::edge_descriptor;
 
 static_assert(std::is_integral<vertex_t>::value,
     "vertex_t is not an integral type, this violates many assumptions that have been made.");
+
+inline void print_graph(const Graph &graph, std::ostream& os = std::cout) {
+    for(auto [vi, ve] = vertices(graph); vi != ve; ++vi) {
+        os << *vi
+           << "\t" << get(boost::vertex_label, graph, *vi)
+           << "\t" << get(boost::vertex_ploidy, graph, *vi)
+           << "\n";
+    }
+    for(auto [ei, ee] = edges(graph); ei != ee; ++ei) {
+        os << source(*ei,graph) << "-->" << target(*ei,graph) << "\n";
+    }
 }
 
-
-using VertexGroupProp = boost::property<boost::vertex_group_t, std::size_t>;
-using VertexLibraryLabelProp =  boost::property<boost::vertex_library_label_t, std::string, VertexGroupProp>;
-using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, int, VertexLibraryLabelProp>;
-using VertexSexProp = boost::property<boost::vertex_sex_t, Sex, VertexPloidyProp>;
-using VertexTypeProp = boost::property<boost::vertex_type_t, VertexType,VertexSexProp>;
-using VertexLabelProp = boost::property<boost::vertex_label_t, std::string, VertexTypeProp>;
-
-using EdgeFamilyProp = boost::property<boost::edge_family_t, std::size_t>;
-using EdgeLengthProp = boost::property<boost::edge_length_t, float>;
-using EdgeTypeProp = boost::property<boost::edge_type_t, EdgeType, EdgeLengthProp>;
-
-using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
-        VertexLabelProp, EdgeTypeProp>;
-
-using vertex_t = boost::graph_traits<Graph>::vertex_descriptor;
-using edge_t = boost::graph_traits<Graph>::edge_descriptor;
-
-static_assert(std::is_integral<vertex_t>::value,
-    "vertex_t is not an integral type, this violates many assumptions that have been made.");
-
+}
 
 bool parse_newick(const std::string &text,
     pedigree_graph::Graph &graph,

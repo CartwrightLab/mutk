@@ -23,7 +23,8 @@
 set(mutk_sources
     version.cpp call.cpp pedigree.cpp utility.cpp
     newick.cpp
-    #relationship_graph.cpp peeling.cpp
+    relationship_graph.cpp
+    #peeling.cpp
     )
 set(mutk_headers mutk.hpp pedigree.hpp utility.hpp relationship_graph.hpp
     memory.hpp peeling.hpp vcf.hpp)

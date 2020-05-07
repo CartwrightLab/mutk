@@ -28,7 +28,7 @@
 
 #include <mutk/mutk.hpp>
 #include <mutk/vcf.hpp>
-//#include <mutk/relationship_graph.hpp>
+#include <mutk/relationship_graph.hpp>
 
 #include <CLI11.hpp>
 
@@ -77,8 +77,8 @@ int main(int argc, char *argv[]) {
 
     auto pedigree = mutk::Pedigree::parse_file(args.ped);
 
-    // mutk::RelationshipGraph graph;
-    // graph.Construct(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
+    mutk::RelationshipGraph graph;
+    graph.Construct(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
 
     return EXIT_SUCCESS;
 }

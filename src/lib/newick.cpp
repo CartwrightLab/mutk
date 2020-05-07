@@ -145,7 +145,7 @@ bool parse_newick(const std::string &text, pedigree_graph::Graph &graph,
 
     std::vector<pedigree_graph::vertex_t> vertex_map(phy.size());
     for(std::size_t x = 0; x < phy.size(); ++x) {
-        vertex_map[x] = add_vertex({phy[x].label, {sex, ploidy}}, graph);
+        vertex_map[x] = add_vertex({phy[x].label, {sex, {ploidy, VertexType::Somatic}}}, graph);
         if(x == 0) {
             add_edge(root, vertex_map[0], {scale*phy[x].length, SOMA_EDGE}, graph);
         } else {
