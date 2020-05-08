@@ -34,9 +34,14 @@
 #include <boost/range/algorithm/find.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/range/adaptor/reversed.hpp>
+#include <boost/range/algorithm/sort.hpp>
 #include <boost/algorithm/cxx11/all_of.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/flat_set.hpp>
 
 #include <boost/graph/topological_sort.hpp>
+#include <boost/graph/graph_utility.hpp>
+#include <boost/heap/d_ary_heap.hpp>
 
 namespace {
 
@@ -59,6 +64,8 @@ void update_edge_lengths(pedigree_graph::Graph &graph, double mu_meiotic, double
 void simplify(pedigree_graph::Graph &graph);
 
 void prune(pedigree_graph::Graph &graph, InheritanceModel model);
+
+void peeling_order(const pedigree_graph::Graph &graph);
 
 } // namespace
 
@@ -88,10 +95,11 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
     // Construct a boost::graph of the pedigree and somatic information
     pedigree_graph::Graph graph;
 
-    construct_pedigree_graph(graph, pedigree, known_samples, normalize_somatic_trees);
+    for(auto v : known_samples) {
+        std::cout << v << "\n";
+    }
 
-    std::cout << "====Pedigree Graph====\n";
-    pedigree_graph::print_graph(graph);
+    construct_pedigree_graph(graph, pedigree, known_samples, normalize_somatic_trees);
  
     // Multiply edge lengths by mutation rates
     update_edge_lengths(graph, mu, mu_somatic);
@@ -99,14 +107,12 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
     // Remove edges that are non-informative
     simplify(graph);
 
-    std::cout << "====Pedigree Graph====\n";
-    pedigree_graph::print_graph(graph);
-
     // Prune pedigree
     prune(graph, inheritance_model_);
 
-    std::cout << "====Pedigree Graph====\n";
     pedigree_graph::print_graph(graph);
+
+    peeling_order(graph);
     
     return true;
 }
@@ -455,58 +461,58 @@ void construct_pedigree_graph(pedigree_graph::Graph &graph,
         return 2;
     };
 
-    // Construct temporary graph
-    pedigree_graph::Graph local_graph;
+    graph.clear();
 
     for(unsigned int j = 0; j < pedigree.NumberOfMembers(); ++j) {
         auto & member = pedigree.GetMember(j);
-        auto v = add_vertex({member.name, {member.sex, {get_ploidy(member), VertexType::Germline}}}, local_graph);
+        auto v = add_vertex({member.name, {member.sex, {get_ploidy(member), VertexType::Germline}}}, graph);
         assert(v == j);
     }
-    add_edges_to_pedigree_graph(pedigree, local_graph);
+    add_edges_to_pedigree_graph(pedigree, graph);
 
-    // topologically sort members
-    std::vector<pedigree_graph::vertex_t> topo_order, vertex_order;
+    // // Construct temporary graph
+    // pedigree_graph::Graph local_graph;
+    // // topologically sort members
+    // std::vector<pedigree_graph::vertex_t> topo_order, vertex_order;
 
-    topological_sort(local_graph, std::back_inserter(topo_order));
+    // topological_sort(local_graph, std::back_inserter(topo_order));
 
-    // sort founders before everyone else
-    std::copy_if(topo_order.rbegin(), topo_order.rend(), std::back_inserter(vertex_order),
-        [&](auto v) {
-            return in_degree(v, local_graph) == 0;
-        });
-    std::copy_if(topo_order.rbegin(), topo_order.rend(), std::back_inserter(vertex_order),
-        [&](auto v) {
-            return in_degree(v, local_graph) > 0;
-        });
+    // // sort founders before everyone else
+    // std::copy_if(topo_order.rbegin(), topo_order.rend(), std::back_inserter(vertex_order),
+    //     [&](auto v) {
+    //         return in_degree(v, local_graph) == 0;
+    //     });
+    // std::copy_if(topo_order.rbegin(), topo_order.rend(), std::back_inserter(vertex_order),
+    //     [&](auto v) {
+    //         return in_degree(v, local_graph) > 0;
+    //     });
 
     // Copy local_graph to graph using vertex_order
-    graph.clear();
 
-    std::vector<pedigree_graph::vertex_t> map_local_to_out(num_vertices(local_graph));
+    // std::vector<pedigree_graph::vertex_t> map_local_to_out(num_vertices(local_graph));
 
-    auto local_vertex_map = get(boost::vertex_all, local_graph);
-    auto graph_vertex_map = get(boost::vertex_all, graph);
-    for(auto &&v : vertex_order) {
-        auto w = add_vertex(graph);
-        map_local_to_out[v] = w;
-        put(graph_vertex_map, w, get(local_vertex_map, v));
-    }
+    // auto local_vertex_map = get(boost::vertex_all, local_graph);
+    // auto graph_vertex_map = get(boost::vertex_all, graph);
+    // for(auto &&v : vertex_order) {
+    //     auto w = add_vertex(graph);
+    //     map_local_to_out[v] = w;
+    //     put(graph_vertex_map, w, get(local_vertex_map, v));
+    // }
 
-    auto local_edge_map = get(boost::edge_all, local_graph);
-    auto graph_edge_map = get(boost::edge_all, graph); 
-    auto edge_range = boost::make_iterator_range(edges(local_graph));
-    for(auto &&e : edge_range) {
-        auto new_src = map_local_to_out[source(e, local_graph)];
-        auto new_tgt = map_local_to_out[target(e, local_graph)];
-        auto [f,b] = add_edge(new_src, new_tgt, graph);
-        put(graph_edge_map, f, get(local_edge_map, e));
-    }
+    // auto local_edge_map = get(boost::edge_all, local_graph);
+    // auto graph_edge_map = get(boost::edge_all, graph); 
+    // auto edge_range = boost::make_iterator_range(edges(local_graph));
+    // for(auto &&e : edge_range) {
+    //     auto new_src = map_local_to_out[source(e, local_graph)];
+    //     auto new_tgt = map_local_to_out[target(e, local_graph)];
+    //     auto [f,b] = add_edge(new_src, new_tgt, graph);
+    //     put(graph_edge_map, f, get(local_edge_map, e));
+    // }
 
     // Add somatic branches and nodes
     for(int i=0;i<pedigree.NumberOfMembers();++i) {
         for(auto && sample : pedigree.GetMember(i).samples) {
-            if(!mutk::detail::parse_newick(sample, graph, map_local_to_out[i],
+            if(!mutk::detail::parse_newick(sample, graph, i,
                 normalize_somatic_trees) ) {
                     throw std::invalid_argument("Unable to parse somatic data for individual '" +
                         pedigree.GetMember(i).name + "'.");
@@ -599,7 +605,93 @@ void simplify(pedigree_graph::Graph &graph) {
         }
         clear_vertex(v, graph);
     }
+}
 
+void peeling_order(const pedigree_graph::Graph &graph) {
+    using vertex_t = pedigree_graph::vertex_t;
+    // Identify probabilistic units
+    //   - Component[i] contains the in-vertexes of i.
+    using component_t = boost::container::small_vector<vertex_t, 2>;
+    std::vector<component_t> components(num_vertices(graph));
+    for(auto v : boost::make_iterator_range(vertices(graph))) {
+        auto in_edge_range = boost::make_iterator_range(in_edges(v,graph));
+        for(auto e : in_edge_range) {
+            components[v].push_back(source(e,graph));
+        }
+        boost::sort(components[v]);
+    }
+
+    // construct an undirected graph of dependencies
+    using two_section_graph_t = boost::adjacency_list<boost::setS,
+        boost::vecS, boost::undirectedS>;
+    two_section_graph_t graph2{components.size()};
+    for(vertex_t v = 0; v < components.size(); ++v) {
+        for(int i=0;i<components[v].size();++i) {
+            // connect a node to is parents
+            // connect all parents together
+            add_edge(components[v][i],v,graph2);
+            for(int j=i+1;j<components[v].size();++j) {
+                add_edge(components[v][i],components[v][j],graph2);
+            }
+        }
+    }
+
+    auto fill_in_count = [&](auto v) {
+        int fill = 0;
+        for(auto [it1,end1] = adjacent_vertices(v,graph2);
+            it1 != end1; ++it1) {
+            auto it2 = it1;
+            for(++it2; it2 != end1; ++it2) {
+                if(is_adjacent(graph2,*it1,*it2) == false) {
+                    fill += 1;
+                }
+            }
+        }
+        return fill;
+    };
+
+    using record_t = std::pair<int,vertex_t>;
+    using heap_t = boost::heap::d_ary_heap<record_t,
+        boost::heap::arity<2>, boost::heap::mutable_<true>,
+        boost::heap::compare<std::greater<record_t>>>;
+
+    heap_t priority_queue;
+
+    // create priority queue based on fill-in
+    std::vector<heap_t::handle_type> handles(num_vertices(graph2));
+    for(auto v : boost::make_iterator_range(vertices(graph2))) {
+        int f = fill_in_count(v);
+        handles[v] = priority_queue.push({f, v});
+    }
+
+    while(!priority_queue.empty()) {
+        for(auto it = priority_queue.ordered_begin();
+            it != priority_queue.ordered_end(); ++it) {
+            std::cout << it->second << " " << it->first << "\n";
+        }
+
+        record_t val = priority_queue.top();
+        priority_queue.pop();
+        std::cout << "eliminating " << val.second << "\n\n";
+        auto [ai,ae] = adjacent_vertices(val.second,graph2);
+        std::vector<vertex_t> adj(ai,ae);
+        // add new edges
+        if(val.first > 0) {
+            for(auto it1 = adj.begin(); it1 != adj.end(); ++it1) {
+                auto it2 = it1;
+                for(++it2; it2 != adj.end(); ++it2) {
+                    add_edge(*it1,*it2,graph2);
+                }
+            }            
+        }
+        // clear eliminated vertex
+        clear_vertex(val.second,graph2);
+        // update all adj vertices
+        for(auto v : adj) {
+            (*handles[v]).first = fill_in_count(v);
+            priority_queue.update(handles[v]);
+        }
+    }
 }
 
 } // namespace 
