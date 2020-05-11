@@ -144,46 +144,53 @@ void mutk::RelationshipGraph::PrintGraph(std::ostream &os) const {
         return "unknown";
     };
 
-    auto print_vertex = [&](auto &&v, const char *str) {
-        os << labels[v] << "\t"
-           << str << "\t"
-           << sex(sexes[v]) << "\t"
-           << ploidies[v] << "\t";
+    auto print_vertex = [&](auto &&v) {
+        os << "  " << labels[v] << ":\n"
+           << "    sex: " << sex(sexes[v]) << "\n"
+           << "    ploidy: " << ploidies[v] << "\n";
         auto [ei,ee] = in_edges(v, graph_);
-        for(auto it = ei; it != ee; ++it) {
-            if(it != ei) {
-                os << ";";
-            }
-            os << labels[source(*it,graph_)] << ":"
-                << get(boost::edge_length, graph_, *it);
+        if(ei == ee) {
+            return;
         }
-        os << "\n";
+        os << "    origin:\n";
+        for(auto it = ei; it != ee; ++it) {
+            os << "      - label:  " << labels[source(*it,graph_)] << "\n"
+               << "        length: " << get(boost::edge_length, graph_, *it) << "\n"
+               << "        sex:    " << sex(sexes[source(*it,graph_)]) << "\n";
+        }
     };
 
-    os << "Name\tType\tSex\tPloidy\tSource\n";
+    os << "%YAML 1.2\n---\n";
 
+    os << "founding:\n";
     for(auto v : vertex_range) {
         if(in_degree(v,graph_) == 0) {
             // add samples
-            print_vertex(v, "FOUNDER");
+            print_vertex(v);
         }
     }
+
+    os << "\ngermline:\n";
     for(auto v : vertex_range) {
         if(in_degree(v,graph_) > 0 && types[v] == VertexType::Germline) {
             // add samples
-            print_vertex(v, "GERMLINE");
+            print_vertex(v);
         }
     }
+
+    os << "\nsomatic:\n";
     for(auto v : vertex_range) {
         if(in_degree(v,graph_) > 0 && types[v] == VertexType::Somatic) {
             // add samples
-            print_vertex(v, "SOMA");
+            print_vertex(v);
         }
     }
+
+    os << "\nsample:\n";
     for(auto v : vertex_range) {
         if(in_degree(v,graph_) > 0 && types[v] == VertexType::Sample) {
             // add samples
-            print_vertex(v, "SAMPLE");
+            print_vertex(v);
         }
     }
 }
@@ -694,6 +701,16 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
         assert(new_src != -1 && new_tgt != -1);
         auto [f,b] = add_edge(new_src, new_tgt, output);
         put(output_edge_map, f, get(input_edge_map, e));
+    }
+
+    auto olabels = get(boost::vertex_label, output);
+    auto otypes = get(boost::vertex_type, output);
+    for(auto &&v : boost::make_iterator_range(vertices(output))) {
+        if(otypes[v] == VertexType::Founder || otypes[v] == VertexType::Germline) {
+            olabels[v] += "/z";
+        } else if(otypes[v] == VertexType::Somatic) {
+            olabels[v] += "/t";
+        }
     }
 
     return output;
