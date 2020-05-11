@@ -61,6 +61,8 @@ public:
             InheritanceModel inheritance_model,
             double mu, double mu_somatic, bool normalize_somatic_trees);
 
+    void PrintGraph(std::ostream &os) const;
+
     // double PeelForwards(peel::workspace_t &work,
     //                     const TransitionMatrixVector &mat) const {
     //     if(work.dirty_lower) {
@@ -114,6 +116,7 @@ public:
 protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 
+    detail::pedigree_graph::Graph graph_;
  
 private:
 };

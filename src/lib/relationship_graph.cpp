@@ -116,13 +116,76 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
     pedigree_graph::print_graph(graph);
 
     // Sort and eliminate cleared vertices
-    auto final_graph = finalize(graph);
-
-    pedigree_graph::print_graph(final_graph);
-
-    peeling_order(final_graph);
+    graph_ = finalize(graph);
     
     return true;
+}
+
+void mutk::RelationshipGraph::PrintGraph(std::ostream &os) const {
+    auto vertex_range = boost::make_iterator_range(vertices(graph_));
+
+    auto labels = get(boost::vertex_label, graph_);
+    auto sexes = get(boost::vertex_sex, graph_);
+    auto ploidies = get(boost::vertex_ploidy, graph_);
+    auto types = get(boost::vertex_type, graph_);
+
+
+    auto sex = [&](mutk::Pedigree::Sex s) {
+        switch(s) {
+        case Sex::Autosomal:
+            return "autosomal";
+        case Sex::Male:
+            return "male";
+        case Sex::Female:
+            return "female";
+        default:
+            break;
+        };
+        return "unknown";
+    };
+
+    auto print_vertex = [&](auto &&v, const char *str) {
+        os << labels[v] << "\t"
+           << str << "\t"
+           << sex(sexes[v]) << "\t"
+           << ploidies[v] << "\t";
+        auto [ei,ee] = in_edges(v, graph_);
+        for(auto it = ei; it != ee; ++it) {
+            if(it != ei) {
+                os << ";";
+            }
+            os << labels[source(*it,graph_)] << ":"
+                << get(boost::edge_length, graph_, *it);
+        }
+        os << "\n";
+    };
+
+    os << "Name\tType\tSex\tPloidy\tSource\n";
+
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph_) == 0) {
+            // add samples
+            print_vertex(v, "FOUNDER");
+        }
+    }
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph_) > 0 && types[v] == VertexType::Germline) {
+            // add samples
+            print_vertex(v, "GERMLINE");
+        }
+    }
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph_) > 0 && types[v] == VertexType::Somatic) {
+            // add samples
+            print_vertex(v, "SOMA");
+        }
+    }
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph_) > 0 && types[v] == VertexType::Sample) {
+            // add samples
+            print_vertex(v, "SAMPLE");
+        }
+    }
 }
 
 namespace {
@@ -588,27 +651,27 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
     // topologically sort members
     std::vector<pedigree_graph::vertex_t> topo_order, vertex_order;
     topological_sort(input, std::back_inserter(topo_order));
-    // sort tips first
-    std::copy_if(topo_order.begin(), topo_order.end(),
-        std::back_inserter(vertex_order), [&](auto v) {
-            return degree(v, input) > 0 && types[v] == VertexType::Sample;
-        });
-    // sort somatic vertices next
-    std::copy_if(topo_order.begin(), topo_order.end(),
-        std::back_inserter(vertex_order), [&](auto v) {
-            return degree(v, input) > 0 && types[v] == VertexType::Somatic;
-        });
-    // sort germline next
-     std::copy_if(topo_order.begin(), topo_order.end(), std::back_inserter(vertex_order),
-        [&](auto v) {
-            return in_degree(v, input) > 0 && types[v] == VertexType::Germline;
-        });
-    // sort founders last
-    std::copy_if(topo_order.begin(), topo_order.end(), std::back_inserter(vertex_order),
+    // Founders
+    std::copy_if(topo_order.rbegin(), topo_order.rend(), std::back_inserter(vertex_order),
         [&](auto v) {
             return in_degree(v, input) == 0 &&
                 out_degree(v, input) > 0 &&
                 types[v] == VertexType::Germline;
+        });
+    // Germline
+    std::copy_if(topo_order.rbegin(), topo_order.rend(), std::back_inserter(vertex_order),
+        [&](auto v) {
+            return in_degree(v, input) > 0 && types[v] == VertexType::Germline;
+        });
+    // Somatic
+    std::copy_if(topo_order.rbegin(), topo_order.rend(),
+        std::back_inserter(vertex_order), [&](auto v) {
+            return degree(v, input) > 0 && types[v] == VertexType::Somatic;
+        });
+    // Samples
+    std::copy_if(topo_order.rbegin(), topo_order.rend(),
+        std::back_inserter(vertex_order), [&](auto v) {
+            return degree(v, input) > 0 && types[v] == VertexType::Sample;
         });
 
     std::vector<pedigree_graph::vertex_t> map_in_to_out(num_vertices(input),-1);
@@ -743,6 +806,7 @@ void peeling_order(const pedigree_graph::Graph &graph) {
 
         auto [score, v] = priority_queue.top();
         priority_queue.pop();
+        handles[v] = heap_t::handle_type{};
         std::cout << "Eliminating Vertex " << v << "\n";
 
         auto &k = cliques[v];
