@@ -615,7 +615,7 @@ void simplify(pedigree_graph::Graph &graph) {
         }
     }
 
-    // bypass nodes that have one out_edge and their descendents
+    // bypass nodes that have one out_edge and their descendants
     for(auto && v : topo_order) {
         if(in_degree(v,graph) == 0 || out_degree(v,graph) != 1) {
             continue;
@@ -716,6 +716,22 @@ using flat_set_t = boost::container::flat_set<pedigree_graph::vertex_t,
         std::less<pedigree_graph::vertex_t>,
         small_vector_t<N_>>;
 
+using record_t = std::pair<int,pedigree_graph::vertex_t>;
+
+struct record_cmp_t {
+    bool operator()(const record_t &a, const record_t &b) const {
+        if(a.first == b.first) {
+            return a.second < b.second;
+        } else {
+            return a.first > b.first;
+        }
+    }
+};
+
+using heap_t = boost::heap::d_ary_heap<record_t,
+    boost::heap::arity<2>, boost::heap::mutable_<true>,
+    boost::heap::compare<record_cmp_t>>;
+
 void peeling_order(const pedigree_graph::Graph &graph) {
     using vertex_t = pedigree_graph::vertex_t;
 
@@ -755,44 +771,33 @@ void peeling_order(const pedigree_graph::Graph &graph) {
     }
 
     // Identify Cliques
-    using clique_t = flat_set_t<8>;
-    std::vector<clique_t> cliques(num_vertices(graph));
+    using neighbors_t = flat_set_t<8>;
+    std::vector<neighbors_t> neighbors(num_vertices(graph));
     for(auto && p : potentials) {
-        for(auto && v : p) {
-            for(auto && w : p) {
-                cliques[v].insert(w);
+        for(auto it1 = p.begin(); it1 != p.end(); ++it1) {
+            auto it2 = it1;
+            for(++it2; it2 != p.end(); ++it2) {
+                neighbors[*it1].insert(*it2);
+                neighbors[*it2].insert(*it1);
             }
         }
     }
-    std::cout << "=== CLIQUES ===\n";
-    for(auto &k : cliques) {
-        for(auto &v : k) {
-            std::cout << v << " ";
-        }
-        std::cout << "\n";
-    }
-    std::cout << "\n\n";
 
     auto fill_in_count = [&](auto v) {
         int fill = 0;
-        const auto& k = cliques[v];
+        const auto& k = neighbors[v];
         for(auto it1 = k.begin(); it1 != k.end(); ++it1) {
             auto it2 = it1;
             for(++it2; it2 != k.end(); ++it2) {
-                if(!cliques[*it1].contains(*it2)) {
+                if(!neighbors[*it1].contains(*it2)) {
                     fill += 1;
                 }
                 //sanity check
-                assert(cliques[*it1].contains(*it2) == cliques[*it2].contains(*it1));
+                assert(neighbors[*it1].contains(*it2) == neighbors[*it2].contains(*it1));
             }
         }
         return fill;
     };
-
-    using record_t = std::pair<int,vertex_t>;
-    using heap_t = boost::heap::d_ary_heap<record_t,
-        boost::heap::arity<2>, boost::heap::mutable_<true>,
-        boost::heap::compare<std::greater<record_t>>>;
 
     heap_t priority_queue;
 
@@ -803,47 +808,43 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         handles[v] = priority_queue.push({f, v});
     }
 
-    while(!priority_queue.empty()) {
-        for(auto it = priority_queue.ordered_begin();
-            it != priority_queue.ordered_end(); ++it) {
-            std::cout << it->second << " " << it->first << "\n";
-        }
+    std::vector<vertex_t> elim_order;
 
+    while(!priority_queue.empty()) {
+        // chose next vertex to eliminate and remove it from the queue
         auto [score, v] = priority_queue.top();
         priority_queue.pop();
         handles[v] = heap_t::handle_type{};
-        std::cout << "Eliminating Vertex #" << v
-            << " (" << get(boost::vertex_label, graph, v) << ")\n";
 
-        auto &k = cliques[v];
+        // record the vertex
+        elim_order.push_back(v);
 
-        std::cout << "    Clique: ";
+        // Update cliques
+        auto &k = neighbors[v];
         for(auto &a : k) {
-            std::cout << " " << a;
-        }
-        std::cout << "\n\n";
-
-        // fill in cliques
-        for(auto &a : k) {
-            if(a == v) {
-                continue;
-            }
             if(score > 0) {
                 for(auto &b : k) {
-                    cliques[a].insert(b);
+                    neighbors[a].insert(b);
                 }                
             }
-            cliques[a].erase(v);
+            neighbors[a].erase(v);
         }
+        // Update the priority queue
         for(auto &a : k) {
-            if(a == v) {
-                continue;
-            }
             (*handles[a]).first = fill_in_count(a);
             priority_queue.update(handles[a]);
         }
     }
-
+    // DEBUG: print elimination information
+    for(auto &&v : elim_order) {
+        std::cout << "Eliminate vertex " << get(boost::vertex_label, graph, v)
+            << " clique is { ";
+        std::cout << get(boost::vertex_label, graph, v);
+        for(auto &&a : neighbors[v]) {
+             std::cout << ", " << get(boost::vertex_label, graph, a);
+        }
+        std::cout << " }\n";
+    }
 
 }
 
