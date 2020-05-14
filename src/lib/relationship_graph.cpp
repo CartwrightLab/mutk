@@ -96,16 +96,10 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
     // Construct a boost::graph of the pedigree and somatic information
     pedigree_graph::Graph graph;
 
-    for(auto v : known_samples) {
-        std::cout << v << "\n";
-    }
-
     construct_pedigree_graph(graph, pedigree, known_samples, normalize_somatic_trees);
  
     // Multiply edge lengths by mutation rates
     update_edge_lengths(graph, mu, mu_somatic);
-
-    pedigree_graph::print_graph(graph);
 
     // Remove edges that are non-informative
     simplify(graph);
@@ -113,11 +107,11 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
     // Prune pedigree
     prune(graph, inheritance_model_);
 
-    pedigree_graph::print_graph(graph);
-
     // Sort and eliminate cleared vertices
     graph_ = finalize(graph);
     
+    peeling_order(graph_);
+
     return true;
 }
 
@@ -500,11 +494,6 @@ void add_edges_to_pedigree_graph(const Pedigree &pedigree, pedigree_graph::Graph
                 throw std::invalid_argument("Unable to construct graph for pedigree; the mother of '" +
                     member.name + "' is male.");
             }
-            // Selfing is not supported
-            if (dad == mom) {
-                throw std::invalid_argument("Unable to construct graph for pedigree; selfing is not supported; "
-                    "father and mother of '" + member.name + "' are the same.");
-            }
             add_edge(dad, v, {dad_len, mutk::detail::GERM_EDGE}, graph);
             add_edge(mom, v, {mom_len, mutk::detail::GERM_EDGE}, graph);
         }
@@ -688,7 +677,6 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
     for(auto &&v : vertex_order) {
         auto w = add_vertex(output);
         map_in_to_out[v] = w;
-        std::cout << "vertex " << v << " maps to vertex " << w << "\n";
         put(graph_vertex_map, w, get(local_vertex_map, v));
     }
 
@@ -824,7 +812,8 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         auto [score, v] = priority_queue.top();
         priority_queue.pop();
         handles[v] = heap_t::handle_type{};
-        std::cout << "Eliminating Vertex " << v << "\n";
+        std::cout << "Eliminating Vertex #" << v
+            << " (" << get(boost::vertex_label, graph, v) << ")\n";
 
         auto &k = cliques[v];
 
@@ -854,6 +843,8 @@ void peeling_order(const pedigree_graph::Graph &graph) {
             priority_queue.update(handles[a]);
         }
     }
+
+
 }
 
 } // namespace 
