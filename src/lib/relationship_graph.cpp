@@ -32,16 +32,18 @@
 #include <unordered_set>
 
 #include <boost/range/algorithm/find.hpp>
+#include <boost/range/adaptor/filtered.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/range/algorithm/sort.hpp>
 #include <boost/algorithm/cxx11/all_of.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/flat_set.hpp>
-
+#include <boost/range/algorithm/set_algorithm.hpp>
 #include <boost/graph/topological_sort.hpp>
 #include <boost/graph/graph_utility.hpp>
 #include <boost/heap/d_ary_heap.hpp>
+#include <boost/range/algorithm/min_element.hpp>
 
 namespace {
 
@@ -707,14 +709,12 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
 // Almond and Kong (1991) Optimality Issues in Constructing a Markov Tree from Graphical Models.
 //     Research Report 329. University of Chicago, Dept. of Statistics
 
-template<int N_>
-//using small_vector_t = boost::container::small_vector<pedigree_graph::vertex_t, N_>;
-using small_vector_t = std::vector<pedigree_graph::vertex_t>;
+template<typename V_, int N_>
+using small_vector_t = boost::container::small_vector<V_, N_>;
+//using small_vector_t = std::vector<pedigree_graph::vertex_t>;
 
-template<int N_>
-using flat_set_t = boost::container::flat_set<pedigree_graph::vertex_t,
-        std::less<pedigree_graph::vertex_t>,
-        small_vector_t<N_>>;
+template<typename V_, int N_>
+using flat_set_t = boost::container::flat_set<V_, std::less<V_>, small_vector_t<V_, N_>>;
 
 using record_t = std::pair<int,pedigree_graph::vertex_t>;
 
@@ -741,7 +741,7 @@ void peeling_order(const pedigree_graph::Graph &graph) {
 
     // Identify vertex dependencies
     //   - dependencies[i] contains the in-vertexes of i.
-    using depends_t = small_vector_t<2>;
+    using depends_t = small_vector_t<pedigree_graph::vertex_t, 2>;
     std::vector<depends_t> depends(num_vertices(graph));
     for(auto v : vertex_range) {
         auto in_edge_range = boost::make_iterator_range(in_edges(v,graph));
@@ -751,7 +751,7 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         boost::sort(depends[v]);
     }
     // Factorize the probability distribution into potentials
-    using potential_t = small_vector_t<4>;
+    using potential_t = small_vector_t<pedigree_graph::vertex_t, 4>;
     std::vector<potential_t> potentials(num_vertices(graph));
     for(auto v : vertex_range) {
         if(out_degree(v,graph) == 0) {
@@ -770,8 +770,8 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         }
     }
 
-    // Identify Cliques
-    using neighbors_t = flat_set_t<8>;
+    // Identify Closures
+    using neighbors_t = flat_set_t<pedigree_graph::vertex_t, 4>;
     std::vector<neighbors_t> neighbors(num_vertices(graph));
     for(auto && p : potentials) {
         for(auto it1 = p.begin(); it1 != p.end(); ++it1) {
@@ -837,13 +837,71 @@ void peeling_order(const pedigree_graph::Graph &graph) {
     }
     // DEBUG: print elimination information
     for(auto &&v : elim_order) {
-        std::cout << "Eliminate vertex " << get(boost::vertex_label, graph, v)
+        std::cerr << "Eliminate vertex " << get(boost::vertex_label, graph, v)
             << " clique is { ";
-        std::cout << get(boost::vertex_label, graph, v);
+        std::cerr << get(boost::vertex_label, graph, v);
         for(auto &&a : neighbors[v]) {
-             std::cout << ", " << get(boost::vertex_label, graph, a);
+             std::cerr << ", " << get(boost::vertex_label, graph, a);
         }
-        std::cout << " }\n";
+        std::cerr << " }\n";
+    }
+
+    using junction_tree_t = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS>;
+    using junction_vertex_t = boost::graph_traits<junction_tree_t>::vertex_descriptor;
+    using junction_edge_t = boost::graph_traits<junction_tree_t>::edge_descriptor;
+
+    junction_tree_t junction_tree;
+    std::vector<neighbors_t> cliques;
+    std::vector<int> is_intersection_node;
+
+    for(auto v : boost::adaptors::reverse(elim_order)) {
+        // add vertex to junction_tree
+        auto j = add_vertex(junction_tree);
+        assert(j == cliques.size()); // Sanity check
+        assert(j == is_intersection_node.size()); // Sanity check
+
+        if(auto it = boost::range::find(cliques, neighbors[v]); it != cliques.end()) {
+            // neighbors of v already exists as a vertex
+            // mark as intersection node and create edge
+            junction_vertex_t pos = std::distance(cliques.begin(), it);
+            is_intersection_node[pos] = true;
+            add_edge(pos, j, junction_tree);
+        } else {
+            using boost::adaptors::filtered;
+            // find the smallest vertex that contains neighbors as a subset.
+            auto is_subset = [&] (const auto &x) {
+                return boost::range::includes(x, neighbors[v]);
+            };
+            auto cmp_size = [&] (const auto &a, const auto &b) {
+                return a.size() < b.size();
+            };
+            it = boost::range::min_element(cliques | filtered(is_subset), cmp_size).base();
+            if(it != cliques.end()) {
+                // find position of connecting vertex
+                junction_vertex_t pos1 = std::distance(cliques.begin(), it);
+                // stash position of new vertex to use for intersection node
+                auto pos2 = j;
+                // update vertex properties
+                cliques.push_back(neighbors[v]);
+                is_intersection_node.push_back(true);
+                // create a new node
+                j = add_vertex(junction_tree);
+                assert(j == cliques.size()); // Sanity check
+                assert(j == is_intersection_node.size()); // Sanity check
+
+                add_edge(pos1, pos2, junction_tree);
+                add_edge(pos2, j, junction_tree);
+            }
+        }
+        // update vertex properties
+        cliques.push_back(neighbors[v]);
+        cliques.back().insert(v);
+        is_intersection_node.push_back(false);
+    }
+
+    // DEBUG: Print Junction Tree
+    for(auto &&e : boost::make_iterator_range(edges(junction_tree))) {
+        std::cerr << source(e,junction_tree) << " --- " << target(e,junction_tree) << std::endl;
     }
 
 }
