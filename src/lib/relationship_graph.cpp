@@ -44,6 +44,7 @@
 #include <boost/graph/graph_utility.hpp>
 #include <boost/heap/d_ary_heap.hpp>
 #include <boost/range/algorithm/min_element.hpp>
+#include <boost/graph/undirected_dfs.hpp>
 
 namespace {
 
@@ -115,6 +116,23 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
     peeling_order(graph_);
 
     return true;
+}
+
+std::vector<const char *>
+mutk::RelationshipGraph::GetSamples() const {
+
+    std::vector<const char *> ret;
+
+    auto vertex_range = boost::make_iterator_range(vertices(graph_));
+    auto labels = get(boost::vertex_label, graph_);
+    auto types = get(boost::vertex_type, graph_);
+
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph_) > 0 && types[v] == VertexType::Sample) {
+            ret.push_back(labels[v].c_str());
+        }
+    }
+    return ret;
 }
 
 void mutk::RelationshipGraph::PrintGraph(std::ostream &os) const {
@@ -846,7 +864,9 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         std::cerr << " }\n";
     }
 
-    using junction_tree_t = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS>;
+    using junction_tree_t = boost::adjacency_list<boost::vecS, boost::vecS,
+        boost::undirectedS, boost::no_property,
+        boost::property<boost::edge_color_t, boost::default_color_type>>;
     using junction_vertex_t = boost::graph_traits<junction_tree_t>::vertex_descriptor;
     using junction_edge_t = boost::graph_traits<junction_tree_t>::edge_descriptor;
 
@@ -899,10 +919,33 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         is_intersection_node.push_back(false);
     }
 
+    // Topologically Sort Junction Tree
+    std::vector<junction_vertex_t> ordered_junction_vertices;
+    boost::topo_sort_visitor sort_visitor(std::back_inserter(ordered_junction_vertices));
+    boost::undirected_dfs(junction_tree,
+        boost::root_vertex(junction_vertex_t(0))
+            .visitor(sort_visitor)
+            .edge_color_map(get(boost::edge_color, junction_tree))
+            );
+
     // DEBUG: Print Junction Tree
-    for(auto &&e : boost::make_iterator_range(edges(junction_tree))) {
-        std::cerr << source(e,junction_tree) << " --- " << target(e,junction_tree) << std::endl;
+    std::cerr << "0";
+    std::cerr << (is_intersection_node[0] ? "i" : "c");
+    for(auto w : cliques[0]) {
+        std::cerr << " " << get(boost::vertex_label, graph, w);
     }
+    std::cerr << std::endl;    
+    for(auto &&e : boost::make_iterator_range(edges(junction_tree))) {
+        std::cerr << source(e,junction_tree) << " --- " << target(e,junction_tree);
+        auto v = target(e,junction_tree);
+        std::cerr << (is_intersection_node[v] ? "i" : "c");
+        for(auto w : cliques[v]) {
+            std::cerr << " " << get(boost::vertex_label, graph, w);
+        }
+        std::cerr << std::endl;
+
+    }
+
 
 }
 

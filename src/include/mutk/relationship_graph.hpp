@@ -63,6 +63,8 @@ public:
 
     void PrintGraph(std::ostream &os) const;
 
+    std::vector<const char *> GetSamples() const;
+
     // double PeelForwards(peel::workspace_t &work,
     //                     const TransitionMatrixVector &mat) const {
     //     if(work.dirty_lower) {
