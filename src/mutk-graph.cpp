@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     auto pedigree = mutk::Pedigree::parse_file(args.ped);
 
     mutk::RelationshipGraph graph;
-    graph.Construct(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
+    graph.ConstructGraph(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
 
     graph.PrintGraph(std::cout);
 

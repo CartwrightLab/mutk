@@ -32,6 +32,8 @@
 #include <mutk/memory.hpp>
 #include <mutk/peeling.hpp>
 
+#include <boost/container/static_vector.hpp>
+
 #include <cmath>
 #include <string>
 #include <vector>
@@ -51,19 +53,59 @@ enum struct InheritanceModel {
 
 namespace detail {
 extern const std::map<std::string, InheritanceModel> CHR_MODEL_MAP;
+
+enum struct Potential {
+    LikelihoodDiploid,   // P(Data|G)
+    LikelihoodHaploid,   // P(Data|H)
+    FounderDiploid,      // P(G)
+    FounderHaploid,      // P(H)
+    CloneDiploid,        // P(G1|G2)
+    CloneHaploid,        // P(H1|H2)
+    GameteDiploid,       // P(H1|G2)
+    ChildDiploidDiploid, // P(G1|G2,G3)
+    ChildHaploidDiploid, // P(G1|H2,G3)
+    ChildDiploidHaploid, // P(G1|G2,H3)
+    ChildHaploidHaploid, // P(G1|H1,H2)
+    ChildSelfingDiploid, // P(G1|G2,G2)
+    ChildSelfingHaploid  // P(G1|H2,H2)
+};
+
+struct potential_t {
+    Potential type;
+    int child;
+    using data_t = std::pair<int,float>;
+    boost::container::static_vector<data_t, 2> parents;
+
+    potential_t(Potential type_arg, int child_arg) : type{type_arg}, child{child_arg} {}
+    potential_t(Potential type_arg, int child_arg, int par1, float dist1) :
+        type{type_arg}, child{child_arg}, parents{{par1,dist1}} {}
+    potential_t(Potential type_arg, int child_arg, int par1, float dist1, int par2, float dist2) :
+        type{type_arg}, child{child_arg}, parents{{par1,dist1},{par2,dist2}} {}
+};
+
+struct workspace_t {
+    std::vector<mutk::matrix_t> stack;
+};
+
 } //namespace detail
 
 class RelationshipGraph {
 public:
     using samples_t = std::vector<const char*>;
+    using workspace_t = detail::workspace_t;
+    using Potential = detail::Potential;
+    using potential_t = detail::potential_t;
 
-    bool Construct(const Pedigree& pedigree, const samples_t& known_samples,
+    void ConstructGraph(const Pedigree& pedigree, const samples_t& known_samples,
             InheritanceModel inheritance_model,
             double mu, double mu_somatic, bool normalize_somatic_trees);
 
+    void ConstructMachine();
+
+
     void PrintGraph(std::ostream &os) const;
 
-    std::vector<const char *> GetSamples() const;
+    samples_t SampleNames() const;
 
     // double PeelForwards(peel::workspace_t &work,
     //                     const TransitionMatrixVector &mat) const {
@@ -102,25 +144,27 @@ public:
     //     return ret;
     // }
 
-    // peel::workspace_t CreateWorkspace() const {
-    //     peel::workspace_t work;
-    //     work.Resize(num_nodes_);
-    //     work.founder_nodes = std::make_pair(first_founder_, first_nonfounder_);
-    //     work.germline_nodes = std::make_pair(first_founder_, first_somatic_);
-    //     work.somatic_nodes = std::make_pair(first_somatic_, first_library_);
-    //     work.library_nodes = std::make_pair(first_library_, num_nodes_);
-
-    //     work.ploidies = ploidies_;
-
-    //     return work;
-    // }
+    workspace_t CreateWorkspace() const;
 
 protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 
     detail::pedigree_graph::Graph graph_;
- 
+
+    using vertex_range_t = std::pair<detail::pedigree_graph::vertex_t,detail::pedigree_graph::vertex_t>;
+
+    vertex_range_t founders_;
+    vertex_range_t descendants_;
+    vertex_range_t samples_;
+
+    size_t stack_size_;
+
+    // The probability potentials of the relationship graph
+    std::vector<potential_t> potentials_;
+
 private:
+
+
 };
 
 // template<typename A, typename M>

@@ -71,6 +71,9 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input);
 
 void peeling_order(const pedigree_graph::Graph &graph);
 
+std::vector<mutk::RelationshipGraph::potential_t>
+create_potentials(const pedigree_graph::Graph &graph);
+
 } // namespace
 
 const std::map<std::string, InheritanceModel> mutk::detail::CHR_MODEL_MAP {
@@ -88,7 +91,7 @@ const std::map<std::string, InheritanceModel> mutk::detail::CHR_MODEL_MAP {
     {"zlinked", InheritanceModel::ZLinked},
 };
 
-bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
+void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
         const samples_t& known_samples, InheritanceModel model,
         double mu, double mu_somatic,
         bool normalize_somatic_trees) {
@@ -112,16 +115,40 @@ bool mutk::RelationshipGraph::Construct(const Pedigree& pedigree,
 
     // Sort and eliminate cleared vertices
     graph_ = finalize(graph);
-    
-    peeling_order(graph_);
 
-    return true;
+    // Identify founders, non-founders, and samples
+    founders_.first = 0;
+    for(founders_.second=0; founders_.second < num_vertices(graph_); ++founders_.second) {
+        if(in_degree(founders_.second,graph_) > 0) {
+            break;
+        }
+    }
+    descendants_.first = founders_.second;
+    for(descendants_.second=0; descendants_.second < num_vertices(graph_); ++descendants_.second) {
+        if(out_degree(descendants_.second,graph_) == 0) {
+            break;
+        }
+    }
+    samples_.first = descendants_.second;
+    samples_.second = num_vertices(graph_);
 }
 
-std::vector<const char *>
-mutk::RelationshipGraph::GetSamples() const {
+void mutk::RelationshipGraph::ConstructMachine() {
+    potentials_ = create_potentials(graph_);
+}
 
-    std::vector<const char *> ret;
+mutk::RelationshipGraph::workspace_t
+mutk::RelationshipGraph::CreateWorkspace() const {
+    workspace_t work;
+
+    work.stack.resize(stack_size_);
+    
+    return work;    
+}
+
+mutk::RelationshipGraph::samples_t
+mutk::RelationshipGraph::SampleNames() const {
+    samples_t ret;
 
     auto vertex_range = boost::make_iterator_range(vertices(graph_));
     auto labels = get(boost::vertex_label, graph_);
@@ -750,6 +777,82 @@ using heap_t = boost::heap::d_ary_heap<record_t,
     boost::heap::arity<2>, boost::heap::mutable_<true>,
     boost::heap::compare<record_cmp_t>>;
 
+std::vector<mutk::RelationshipGraph::potential_t>
+create_potentials(const pedigree_graph::Graph &graph) {
+    using vertex_t = pedigree_graph::vertex_t;
+    using Potential = mutk::RelationshipGraph::Potential;
+
+    auto types = get(boost::vertex_type, graph);
+    auto ploidies = get(boost::vertex_ploidy, graph);
+    auto lengths = get(boost::edge_length, graph);
+
+    std::vector<mutk::RelationshipGraph::potential_t> ret;
+    
+    auto vertex_range = boost::make_iterator_range(vertices(graph));   
+    // add samples
+    for(auto v : vertex_range) {
+        // sanity checks
+        assert(ploidies[v] == 1 || ploidies[v] == 2);
+        assert(in_degree(v,graph) <= 2);
+        if(out_degree(v,graph) == 0) {
+            auto pot_type = (ploidies[v] == 1) ? Potential::LikelihoodHaploid
+                                               : Potential::LikelihoodDiploid;
+            ret.emplace_back(pot_type, v);
+        }
+    }
+    // add founders
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph) == 0) {
+            auto pot_type = (ploidies[v] == 1) ? Potential::FounderHaploid
+                                               : Potential::FounderDiploid;
+            ret.emplace_back(pot_type, v);
+        }
+    }
+    // add transitions
+    for(auto v : vertex_range) {
+        if(in_degree(v,graph) == 1) {
+            auto [ei, ee] = in_edges(v,graph);
+            auto  par1 = source(*ei,graph);
+            float len1 = lengths[*ei];
+            // identify the type of transition
+            Potential pot_type;
+            if(ploidies[par1] == 2) {
+                // diploid -> diploid (clone) or
+                // diploid -> haploid (gamete)
+                pot_type = (ploidies[v] == 1) ? Potential::GameteDiploid
+                                              : Potential::CloneDiploid;
+            } else {
+                // haploid -> haploid (clone)
+                assert(ploidies[v] == 1);
+                pot_type = Potential::CloneHaploid;
+            }
+            ret.emplace_back(pot_type, v, par1, len1);
+        } else if(in_degree(v,graph) == 2) {
+            auto [ei, ee] = in_edges(v,graph);
+            auto  par1 = source(*ei,graph);
+            float len1 = lengths[*ei];
+            ++ei;
+            auto  par2 = source(*ei,graph);
+            float len2 = lengths[*ei];
+            // identify the type of transition
+            Potential pot_type;
+            if(par1 == par2) {
+                // selfing
+                pot_type = (ploidies[v] == 1) ? Potential::ChildSelfingHaploid
+                                              : Potential::ChildSelfingDiploid;
+            } else if(ploidies[par1] == 2) {
+                pot_type = (ploidies[par2] == 1) ? Potential::ChildDiploidHaploid
+                                                 : Potential::ChildDiploidDiploid;
+            } else {
+                pot_type = (ploidies[par2] == 1) ? Potential::ChildHaploidHaploid
+                                                 : Potential::ChildHaploidDiploid;                
+            }
+            ret.emplace_back(pot_type, v, par1, len1, par2, len2);
+        }
+    }
+    return ret;
+}
+
 void peeling_order(const pedigree_graph::Graph &graph) {
     using vertex_t = pedigree_graph::vertex_t;
 
@@ -784,7 +887,6 @@ void peeling_order(const pedigree_graph::Graph &graph) {
             potentials.push_back({v});
             potentials.back().insert(potentials.back().end(),
                 depends[v].begin(), depends[v].end());
-
         }
     }
 
@@ -826,8 +928,10 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         handles[v] = priority_queue.push({f, v});
     }
 
-    std::vector<vertex_t> elim_order;
+    std::vector<vertex_t> elim_order(num_vertices(graph));
+    std::vector<size_t> vertex_to_elim_order(num_vertices(graph));
 
+    size_t counter = 0;
     while(!priority_queue.empty()) {
         // chose next vertex to eliminate and remove it from the queue
         auto [score, v] = priority_queue.top();
@@ -835,7 +939,9 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         handles[v] = heap_t::handle_type{};
 
         // record the vertex
-        elim_order.push_back(v);
+        elim_order[counter] = v;
+        vertex_to_elim_order[v] = counter;
+        ++counter;
 
         // Update cliques
         auto &k = neighbors[v];
@@ -945,8 +1051,6 @@ void peeling_order(const pedigree_graph::Graph &graph) {
         std::cerr << std::endl;
 
     }
-
-
 }
 
 } // namespace 

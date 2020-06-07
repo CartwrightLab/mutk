@@ -37,6 +37,9 @@
 
 namespace mutk {
 
+using matrix_t = Eigen::MatrixXf;
+using array_t = Eigen::ArrayXf;
+
 #define MUTK_INDIVIDUAL_BUFFER_MIN DBL_MIN
 
 const Eigen::IOFormat CLEAN_FORMAT{4, 0, ", ", "\n", "[", "]"};
