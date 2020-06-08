@@ -151,6 +151,32 @@ void mutk::RelationshipGraph::ConstructMachine() {
     auto elim_order = triangulate_graph(graph_);
 
     junction_tree_ = create_junction_tree(elim_order.first, elim_order.second);
+
+    // DEBUG: Print Junction Tree
+    std::cerr << std::endl;    
+    for(auto &&e : boost::make_iterator_range(edges(junction_tree_))) {
+        auto v = source(e,junction_tree_);
+        bool b = false;
+        for(auto w : get(boost::vertex_label, junction_tree_, v)) {
+            if(b) {
+                std::cerr << ", ";
+            }
+            b = true;
+            std::cerr << get(boost::vertex_label, graph_, w);
+        }
+
+        std::cerr << " --- ";
+        v = target(e,junction_tree_);
+        b = false;
+        for(auto w : get(boost::vertex_label, junction_tree_, v)) {
+            if(b) {
+                std::cerr << ", ";
+            }
+            b = true;
+            std::cerr << get(boost::vertex_label, graph_, w);
+        }
+        std::cerr << std::endl;
+    }    
 }
 
 mutk::RelationshipGraph::workspace_t
@@ -969,14 +995,19 @@ junction_tree::Graph create_junction_tree(
         junction_tree::vertex_t j;
 
         auto node_range = boost::make_iterator_range(vertices(ret));
-        auto nit = boost::range::find_if(node_range, [&](const auto &n){
-            return (neighbors[v] == node_labels[n]);
+        
+        if(neighbors[v].empty()) {
+            j = add_vertex({{v}}, ret);
+            continue;
+        }
+        auto nit = boost::range::find_if(node_range, [&](const auto &n) {
+                return (neighbors[v] == node_labels[n]);
         });
         if(nit != boost::end(node_range)) {
             // neighbors of v already exists as a vertex
             // mark as intersection node and create edge
             j = add_vertex(ret);
-            add_edge(*nit, j, ret);            
+            add_edge(*nit, j, ret);
         } else {
             using boost::adaptors::filtered;
             // find the smallest vertex that contains neighbors as a subset.
@@ -987,27 +1018,22 @@ junction_tree::Graph create_junction_tree(
                 return node_labels[a].size() < node_labels[b].size();
             };
             nit = boost::range::min_element(node_range | filtered(is_subset), cmp_size).base();
-            if(nit != boost::end(node_range)) {
-                // create an intersection node for the neighbors
-                auto p = add_vertex(ret);
-                node_labels[p] = neighbors[v];
-                add_edge(*nit, p, ret);
-                // create a new node
-                j = add_vertex(ret);
-                add_edge(p, j, ret);
-            } else {
-                j = add_vertex(ret);
-            }
+            assert(nit != boost::end(node_range));
+            // create an intersection node for the neighbors
+            auto p = add_vertex(ret);
+            node_labels[p] = neighbors[v];
+            add_edge(*nit, p, ret);
+            // create a new node
+            j = add_vertex(ret);
+            add_edge(p, j, ret);
         }
         // update vertex properties
         node_labels[j] = neighbors[v];
         node_labels[j].insert(v);
 
         // attach singleton vertex
-        if(!neighbors[v].empty()) {
-            auto k = add_vertex({{v}}, ret);
-            add_edge(j, k, ret);
-        }
+        auto k = add_vertex({{v}}, ret);
+        add_edge(j, k, ret);
     }
 
     // Topologically Sort Junction Tree
@@ -1017,22 +1043,6 @@ junction_tree::Graph create_junction_tree(
         .visitor(sort_visitor)
         .edge_color_map(get(boost::edge_color, ret))
     );
-
-    // DEBUG: Print Junction Tree
-    std::cerr << "0";
-    for(auto w : node_labels[0]) {
-        std::cerr << " " << w;
-    }
-    std::cerr << std::endl;    
-    for(auto &&e : boost::make_iterator_range(edges(ret))) {
-        std::cerr << source(e,ret) << " --- " << target(e,ret);
-        auto v = target(e,ret);
-        for(auto w : node_labels[v]) {
-            std::cerr << " " << w;
-        }
-        std::cerr << std::endl;
-    }
-
     return ret;
 }
 
