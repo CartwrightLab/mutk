@@ -150,6 +150,7 @@ protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 
     detail::pedigree_graph::Graph graph_;
+    detail::junction_tree::Graph junction_tree_;
 
     using vertex_range_t = std::pair<detail::pedigree_graph::vertex_t,detail::pedigree_graph::vertex_t>;
 

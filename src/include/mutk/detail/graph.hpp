@@ -30,15 +30,17 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/biconnected_components.hpp>
 #include <boost/graph/connected_components.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/flat_set.hpp>
 
 // Install boost graph properties
 namespace boost {
 enum edge_length_t { edge_length };
 enum edge_type_t { edge_type };
+
 enum vertex_sex_t { vertex_sex };
 enum vertex_ploidy_t {vertex_ploidy };
 enum vertex_label_t { vertex_label };
-enum vertex_library_label_t { vertex_library_label };
 enum vertex_type_t { vertex_type };
 
 enum edge_family_t { edge_family };
@@ -49,7 +51,6 @@ BOOST_INSTALL_PROPERTY(edge, type);
 BOOST_INSTALL_PROPERTY(vertex, sex);
 BOOST_INSTALL_PROPERTY(vertex, ploidy);
 BOOST_INSTALL_PROPERTY(vertex, label);
-BOOST_INSTALL_PROPERTY(vertex, library_label);
 BOOST_INSTALL_PROPERTY(vertex, type);
 
 BOOST_INSTALL_PROPERTY(edge, family);
@@ -110,6 +111,28 @@ bool parse_newick(const std::string &text,
     pedigree_graph::Graph &graph,
     pedigree_graph::vertex_t root,
     bool normalize);
+
+namespace junction_tree {
+template<typename V_, int N_>
+using small_vector_t = boost::container::small_vector<V_, N_>;
+//using small_vector_t = std::vector<pedigree_graph::vertex_t>;
+
+template<typename V_, int N_>
+using flat_set_t = boost::container::flat_set<V_, std::less<V_>, small_vector_t<V_, N_>>;
+using neighbors_t = flat_set_t<pedigree_graph::vertex_t, 4>;
+
+using VertexProp = boost::property<boost::vertex_label_t, neighbors_t>;
+
+using EdgeProp = boost::property<boost::edge_color_t, boost::default_color_type>;
+
+using Graph = boost::adjacency_list<boost::vecS, boost::vecS,
+    boost::undirectedS, VertexProp, EdgeProp>;
+
+using vertex_t = boost::graph_traits<Graph>::vertex_descriptor;
+using edge_t = boost::graph_traits<Graph>::edge_descriptor;
+}
+
+
 
 } // namespace mutk::detail
 } // namespace mutk
