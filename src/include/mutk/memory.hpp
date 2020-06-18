@@ -32,28 +32,16 @@
 
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
-#include <Eigen/Sparse>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <unsupported/Eigen/CXX11/Tensor>
 
 namespace mutk {
 
-using matrix_t = Eigen::MatrixXf;
-using array_t = Eigen::ArrayXf;
+template<std::size_t N>
+using Tensor = Eigen::Tensor<float,N>;
 
-#define MUTK_INDIVIDUAL_BUFFER_MIN DBL_MIN
 
-const Eigen::IOFormat CLEAN_FORMAT{4, 0, ", ", "\n", "[", "]"};
 
-using GenotypeArray = Eigen::ArrayXd;
-using GenotypeArrayVector = std::vector<GenotypeArray, Eigen::aligned_allocator<GenotypeArray>>;
-
-using TransitionMatrix = Eigen::MatrixXd; // element (i,j) is the P(j|i)
-using TransitionMatrixVector = std::vector<TransitionMatrix>;
-
-using TemporaryMatrix = Eigen::ArrayXXd;
-
-using ParentArray = Eigen::ArrayXd;
-using ParentArrayVector = std::vector<ParentArray>;
 
 template<typename A, typename B>
 inline auto kronecker_product_coef(const A &a, const B &b, std::size_t i,

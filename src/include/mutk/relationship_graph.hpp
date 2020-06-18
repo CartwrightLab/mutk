@@ -84,10 +84,14 @@ struct potential_t {
 };
 
 struct workspace_t {
-    std::vector<mutk::matrix_t> stack;
+    std::vector<mutk::Tensor<1>> stack;
+    std::array<std::size_t,3> widths;
 };
 
 } //namespace detail
+
+
+class PeelingVertex;
 
 class RelationshipGraph {
 public:
@@ -96,61 +100,27 @@ public:
     using Potential = detail::Potential;
     using potential_t = detail::potential_t;
 
+    using graph_t = detail::pedigree_graph::Graph;
+    using junction_tree_t = detail::junction_tree::Graph;
+
     void ConstructGraph(const Pedigree& pedigree, const samples_t& known_samples,
             InheritanceModel inheritance_model,
             double mu, double mu_somatic, bool normalize_somatic_trees);
 
-    void ConstructMachine();
+    void ConstructPeeler();
 
 
     void PrintGraph(std::ostream &os) const;
 
     samples_t SampleNames() const;
 
-    // double PeelForwards(peel::workspace_t &work,
-    //                     const TransitionMatrixVector &mat) const {
-    //     if(work.dirty_lower) {
-    //         work.CleanupFast();
-    //     }
-
-    //     // Peel pedigree one family at a time
-    //     for(std::size_t i = 0; i < peeling_functions_.size(); ++i) {
-    //         (*peeling_functions_[i])(work, family_members_[i], mat);
-    //     }
-
-    //     // Sum over roots
-    //     double ret = 0.0;
-    //     for(auto r : roots_) {
-    //         ret += log((work.lower[r] * work.upper[r]).sum());
-    //     }
-        
-    //     return ret;
-    // }
-
-    // double PeelBackwards(peel::workspace_t &work,
-    //                      const TransitionMatrixVector &mat) const {
-    //     double ret = 0.0;
-    //     // Divide by the likelihood
-    //     for(auto r : roots_) {
-    //         double sum = (work.lower[r] * work.upper[r]).sum();
-    //         ret += log(sum);
-    //         work.lower[r] /= sum;
-    //     }
-
-    //     for(std::size_t i = peeling_reverse_functions_.size(); i > 0; --i) {
-    //         (*peeling_reverse_functions_[i - 1])(work, family_members_[i - 1], mat);
-    //     }
-    //     work.dirty_lower = true;
-    //     return ret;
-    // }
-
     workspace_t CreateWorkspace() const;
 
 protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 
-    detail::pedigree_graph::Graph graph_;
-    detail::junction_tree::Graph junction_tree_;
+    graph_t graph_;
+    junction_tree_t junction_tree_;
 
     using vertex_range_t = std::pair<detail::pedigree_graph::vertex_t,detail::pedigree_graph::vertex_t>;
 
@@ -163,30 +133,99 @@ protected:
     // The probability potentials of the relationship graph
     std::vector<potential_t> potentials_;
 
-private:
+    using peeling_t = std::unique_ptr<PeelingVertex>;
+    std::vector<peeling_t> peeling_vertexes_;
 
+private:
 
 };
 
-// template<typename A, typename M>
-// inline
-// RelationshipGraph create_relationship_graph(const A& arg, M* mpileup) {
-//     assert(mpileup != nullptr);
-//     // Parse Pedigree from File
-//     Pedigree ped = io::parse_ped(arg.ped);
-//     // Construct peeling algorithm from parameters and pedigree information
-//     RelationshipGraph relationship_graph;
-//     if (!relationship_graph.Construct(ped, mpileup->libraries(), inheritance_model(arg.model),
-//                                       arg.mu, arg.mu_somatic, arg.mu_library,
-//                                       arg.normalize_somatic_trees)) {
-//         throw std::runtime_error("Unable to construct peeler for pedigree; "
-//                                  "possible non-zero-loop relationship_graph.");
-//     }
-//     // Select libraries in the input that are used in the pedigree
-//     mpileup->SelectLibraries(relationship_graph.library_names());
+class PeelingVertex {
+public:
+    using workspace_t = mutk::RelationshipGraph::workspace_t;
+    using tree_t = detail::junction_tree::Graph;
+    using vertex_t = detail::junction_tree::vertex_t;
 
-//     return relationship_graph;
-// }
+    virtual ~PeelingVertex() = default;
+    virtual void Forward(RelationshipGraph::workspace_t *work) const = 0;
+};
+
+template<std::size_t N>
+class GeneralPeelingVertex {
+public:
+    using tensor_t = mutk::Tensor<N>;
+
+    virtual ~GeneralPeelingVertex() = default;
+
+    struct data_t {
+        std::size_t index;
+        typename tensor_t::Dimensions data_ploidy;
+        typename tensor_t::Dimensions broadcast_ploidy;
+    };
+
+    void Forward(PeelingVertex::workspace_t *work);
+
+    data_t buffer_;
+
+    data_t local_data_;
+    data_t output_data_;
+    std::vector<data_t> input_data_;
+};
+
+namespace detail {
+template<std::size_t N>
+using dims_t = typename mutk::Tensor<N>::Dimensions;
+}
+
+template<std::size_t N>
+void GeneralPeelingVertex<N>::Forward(PeelingVertex::workspace_t *work) {
+    // copy local data to local buffer
+    work->stack[buffer_.index] = work->stack[local_data_.index];
+
+    auto dims = calc_dims(*work, local_data_.data_ploidy);
+    for(int i=0;i<input_data_.size(); ++i) {
+        auto input_dims = calc_dims(*work, input_data_[i].data_ploidy);
+        auto broadcast_dims = calc_dims(*work, input_data_[i].broadcast_ploidy);
+        work->stack[buffer_.index].reshape(dims) *= 
+            work->stack[input_data_[i].index].reshape(input_dims).broadcast(broadcast_dims);
+    }
+    auto msg_dims = calc_dims(*work, output_data_.data_ploidy);
+    std::vector<typename tensor_t::Index> sum_dims;
+
+    for(typename tensor_t::Index i=0; i < msg_dims.size(); ++i) {
+        if(msg_dims[i] == 1) {
+            sum_dims.push_back(i);
+        }
+    }
+    switch(sum_dims.size()) {
+    case 0: {
+        work->stack[output_data_.index] = work->stack[buffer_.index];
+        break;
+    }
+    case 1: {
+        work->stack[output_data_.index].reshape(msg_dims) =
+            work->stack[buffer_.index].reshape(dims)
+                .sum(detail::dims_t<1>{sum_dims[0]}).reshape(msg_dims);
+        break;
+    }
+    case 2: {
+        work->stack[output_data_.index].reshape(msg_dims) =
+            work->stack[buffer_.index].reshape(dims)
+                .sum(detail::dims_t<2>{sum_dims[0],sum_dims[1]}).reshape(msg_dims);
+        break;
+    }
+    case 3: {
+        work->stack[output_data_.index].reshape(msg_dims) =
+            work->stack[buffer_.index].reshape(dims)
+                .sum(detail::dims_t<3>{sum_dims[0],sum_dims[1],sum_dims[2]}).reshape(msg_dims);
+        break;
+    }    
+    default:
+        assert(false);
+    };
+}
+
+
 
 }; // namespace mutk
 

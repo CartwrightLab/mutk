@@ -40,6 +40,7 @@
 #include <boost/algorithm/cxx11/all_of.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/flat_set.hpp>
+#include <boost/container/flat_map.hpp>
 #include <boost/range/algorithm/set_algorithm.hpp>
 #include <boost/graph/topological_sort.hpp>
 #include <boost/graph/graph_utility.hpp>
@@ -145,7 +146,7 @@ void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
     samples_.second = num_vertices(graph_);
 }
 
-void mutk::RelationshipGraph::ConstructMachine() {
+void mutk::RelationshipGraph::ConstructPeeler() {
     potentials_ = create_potentials(graph_);
 
     auto elim_order = triangulate_graph(graph_);
@@ -176,7 +177,55 @@ void mutk::RelationshipGraph::ConstructMachine() {
             std::cerr << get(boost::vertex_label, graph_, w);
         }
         std::cerr << std::endl;
-    }    
+    }
+
+    // connect potentials with junction tree.
+    boost::container::flat_map<junction_tree::neighbors_t,junction_tree::vertex_t>
+        map_labels_to_nodes;
+    // build a container that lines a set of graph vertices with a node in the
+    // junction tree
+    auto node_labels = get(boost::vertex_label, junction_tree_);
+    for(junction_tree::vertex_t v = 0; v < num_vertices(junction_tree_); ++v) {
+        map_labels_to_nodes[node_labels[v]] = v;
+    }
+    // construct the set of graph vertices for each potential, and lookup the
+    // junction tree node corresponding to the set.
+    std::vector<size_t> node_to_potential(num_vertices(junction_tree_), -1);
+    for(size_t i = 0; i < potentials_.size(); ++i) {
+        neighbors_t label;
+        for(auto &&a : potentials_[i].parents) {
+            label.insert(a.first);
+        }
+        label.insert(potentials_[i].child);
+        junction_tree::vertex_t v = map_labels_to_nodes[label];
+        // check for duplicated potentials
+        assert(node_to_potential[v] != -1);
+        node_to_potential[v] = i;
+    }
+    // sort the labels of each node according to elimination order
+    std::vector<std::size_t> elim_location(num_vertices(graph_));
+    for(size_t n = 0; n < elim_order.first.size(); ++n) {
+        elim_location[elim_order.first[n]] = n;
+    }
+    using tensor_label_t = junction_tree::small_vector_t<pedigree_graph::vertex_t, 4>;
+    std::vector<tensor_label_t> tensor_labels(num_vertices(junction_tree_));
+    auto node_range = boost::make_iterator_range(vertices(junction_tree_));
+    for(auto &&v : node_range) {
+        const neighbors_t &label = node_labels[v];
+        tensor_label_t tensor_lab(label.begin(), label.end());
+        boost::range::sort(tensor_lab, [&](auto a, auto b) {
+            return elim_location[a] < elim_location[b];
+        });
+        tensor_labels[v] = tensor_lab;
+    }
+
+    // iterate the junction tree in reverse order
+    auto rev_node_range = boost::adaptors::reverse(node_range);
+    for(auto &&v : rev_node_range) {
+        const neighbors_t &label = node_labels[v];
+
+    }
+
 }
 
 mutk::RelationshipGraph::workspace_t
@@ -822,6 +871,8 @@ create_potentials(const pedigree_graph::Graph &graph) {
             auto pot_type = (ploidies[v] == 1) ? Potential::FounderHaploid
                                                : Potential::FounderDiploid;
             ret.emplace_back(pot_type, v);
+            // founders can't also be samples, as it ruins assumptions.
+            assert(out_degree(v,graph) > 0);
         }
     }
     // add transitions

@@ -22,37 +22,8 @@
 # SOFTWARE.
 */
 
-#include <mutk/peeling.hpp>
+#include <mutk/relationship_graph.hpp>
 
-using workspace_t = mutk::workspace_t;
+using workspace_t = mutk::RelationshipGraph::workspace_t;
 
-void mutk::PeelUp::operator()(workspace_t *work, const TransitionMatrix &mat) const {
-    assert(work != nullptr);
-    work->lower[output_] = (mat * work->lower[a_].matrix()).array();
-}
 
-void mutk::PeelUpStar::operator()(workspace_t *work, const TransitionMatrix &mat) const {
-    assert(work != nullptr);
-    work->lower[output_] = (mat * work->lower[a_].matrix()).array() *
-        work->lower[b_];
-}
-
-void mutk::PeelDown::operator()(workspace_t *work, const TransitionMatrix &mat) const {
-    assert(work != nullptr);
-    work->upper[output_] = (mat * (work->upper[a_] *
-                         work->lower[b_]).matrix()).array();
-}
-
-void mutk::PeelStar::operator()(workspace_t *work, const TransitionMatrix &/*mat*/) const {
-    assert(work != nullptr);
-    work->upper[output_] = work->upper[a_] * work->lower[b_];
-}
-
-void mutk::PeelMate::operator()(workspace_t *work, const TransitionMatrix &/*mat*/) const {
-    assert(work != nullptr);
-    auto mate_width = work->upper[b_].size();
-    auto pivot_width = work->lower[a_].size()/mate_width;
-
-    Eigen::Map<TransitionMatrix> vmat{work->lower[a_].data(), pivot_width, mate_width};
-    work->lower[output_] = (vmat * work->upper[b_].matrix()).array();
-}
