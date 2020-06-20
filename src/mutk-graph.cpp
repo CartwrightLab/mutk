@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
     mutk::RelationshipGraph graph;
     graph.ConstructGraph(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
 
-    graph.ConstructMachine();
+    graph.ConstructPeeler();
 
     graph.PrintGraph(std::cout);
 
