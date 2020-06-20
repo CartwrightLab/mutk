@@ -27,6 +27,7 @@
 #include <mutk/relationship_graph.hpp>
 #include <mutk/detail/graph.hpp>
 
+#include <cmath>
 #include <queue>
 #include <algorithm>
 #include <unordered_set>
@@ -106,6 +107,22 @@ const std::map<std::string, InheritanceModel> mutk::detail::CHR_MODEL_MAP {
     {"zlinked", InheritanceModel::ZLinked},
 };
 
+float mutk::RelationshipGraph::PeelForward(workspace_t *work) const {
+    assert(work != nullptr);
+    assert(work->stack.size() >= stack_size_);
+
+    for(auto &&peeler : peelers_) {
+        peeler->Forward(work);
+    }
+    float log_ret = work->scale;
+
+    for(auto r : roots_) {
+        assert(work->stack[r].size() == 1);
+        log_ret += log(work->stack[r][0]);
+    }
+    return log_ret;
+}
+
 void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
         const samples_t& known_samples, InheritanceModel model,
         double mu, double mu_somatic,
@@ -151,35 +168,35 @@ void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
 void mutk::RelationshipGraph::ConstructPeeler() {
     potentials_ = create_potentials(graph_);
 
-    auto elim_order = triangulate_graph(graph_);
+    auto elim_steps = triangulate_graph(graph_);
 
-    junction_tree_ = create_junction_tree(elim_order.first, elim_order.second);
+    junction_tree_ = create_junction_tree(elim_steps.first, elim_steps.second);
 
     // DEBUG: Print Junction Tree
-    std::cerr << std::endl;    
-    for(auto &&e : boost::make_iterator_range(edges(junction_tree_))) {
-        auto v = source(e,junction_tree_);
-        bool b = false;
-        for(auto w : get(boost::vertex_label, junction_tree_, v)) {
-            if(b) {
-                std::cerr << ", ";
-            }
-            b = true;
-            std::cerr << get(boost::vertex_label, graph_, w);
-        }
+    // std::cerr << std::endl;    
+    // for(auto &&e : boost::make_iterator_range(edges(junction_tree_))) {
+    //     auto v = source(e,junction_tree_);
+    //     bool b = false;
+    //     for(auto w : get(boost::vertex_label, junction_tree_, v)) {
+    //         if(b) {
+    //             std::cerr << ", ";
+    //         }
+    //         b = true;
+    //         std::cerr << get(boost::vertex_label, graph_, w);
+    //     }
 
-        std::cerr << " --- ";
-        v = target(e,junction_tree_);
-        b = false;
-        for(auto w : get(boost::vertex_label, junction_tree_, v)) {
-            if(b) {
-                std::cerr << ", ";
-            }
-            b = true;
-            std::cerr << get(boost::vertex_label, graph_, w);
-        }
-        std::cerr << std::endl;
-    }
+    //     std::cerr << " --- ";
+    //     v = target(e,junction_tree_);
+    //     b = false;
+    //     for(auto w : get(boost::vertex_label, junction_tree_, v)) {
+    //         if(b) {
+    //             std::cerr << ", ";
+    //         }
+    //         b = true;
+    //         std::cerr << get(boost::vertex_label, graph_, w);
+    //     }
+    //     std::cerr << std::endl;
+    // }
 
     // build a container that aligns a set of graph vertices with a node in the
     // junction tree
@@ -218,10 +235,10 @@ void mutk::RelationshipGraph::ConstructPeeler() {
         node_to_potential[v] = potentials_.size()-1;
     }
 
-    // sort the labels of each node according to elimination order
-    std::vector<std::size_t> elim_location(num_vertices(graph_));
-    for(size_t n = 0; n < elim_order.first.size(); ++n) {
-        elim_location[elim_order.first[n]] = n;
+    // sort the labels of each node according to elimination rank
+    elimination_rank_.resize(num_vertices(graph_));
+    for(size_t n = 0; n < elim_steps.first.size(); ++n) {
+        elimination_rank_[elim_steps.first[n]] = n;
     }
     using tensor_label_t = std::vector<PeelingVertex::label_t>;
     std::vector<tensor_label_t> tensor_labels(num_vertices(junction_tree_));
@@ -230,14 +247,13 @@ void mutk::RelationshipGraph::ConstructPeeler() {
         const neighbors_t &label = node_labels[v];
         tensor_label_t tensor_lab(label.begin(), label.end());
         boost::range::sort(tensor_lab, [&](auto a, auto b) {
-            return elim_location[a] < elim_location[b];
+            return elimination_rank_[a] < elimination_rank_[b];
         });
         tensor_labels[v] = tensor_lab;
     }
 
     // ploidy information
     auto ploidies = get(boost::vertex_ploidy, graph_);
-
 
     // The first part of the stack refers to potentials
     // Counter will track all the additional messages
@@ -292,7 +308,16 @@ void mutk::RelationshipGraph::ConstructPeeler() {
                 peeler->AddInput(tensor_labels[w], output_index[w]);
             }
         }
+        // we have a root peeler
+        if(output_index[v] == -1) {
+            peeler->AddOutput({}, counter);
+            roots_.push_back(v);
+            output_index[v] = counter++;
+
+        }
+        peelers_.push_back(std::move(peeler));
     }
+    stack_size_ = counter;
 }
 
 mutk::RelationshipGraph::workspace_t

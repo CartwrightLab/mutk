@@ -64,10 +64,28 @@ class BcfReader {
         }
     }
 
+    bcf_hdr_t *header() { return header_.get(); }
     const bcf_hdr_t *header() const { return header_.get(); }
+    
 
     std::pair<const char *const*, int> samples() const {
         return {header()->samples, bcf_hdr_nsamples(header())};
+    }
+
+    int SetSamples(const std::vector<const char*> &samples, bool inverse=false) {
+        if(samples.empty()) {
+            return bcf_hdr_set_samples(header(), nullptr, 0);
+        }
+        std::string str;
+        if(inverse) {
+            str += "^";
+        }
+        str += samples[0];
+        for(int i=1;i<samples.size();++i) {
+            str += ",";
+            str += samples[i];
+        }
+        return bcf_hdr_set_samples(header(), str.c_str(), 0);
     }
 
     template <typename callback_t>

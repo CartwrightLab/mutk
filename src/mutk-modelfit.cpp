@@ -26,12 +26,16 @@
 #include <filesystem>
 
 #include <mutk/mutk.hpp>
+#include <mutk/vcf.hpp>
+#include <mutk/relationship_graph.hpp>
 
 #include <CLI11.hpp>
 
 #include "subcommand.hpp"
 
 using namespace std::string_literals;
+
+using InheritanceModel = mutk::InheritanceModel;
 
 namespace {
 struct args_t {
@@ -47,7 +51,7 @@ struct args_t {
     double seq_overdisp_hom{0.0};
     double seq_overdisp_het{0.0};
 
-    std::string chr_model{"autosomal"s};
+    InheritanceModel chr_model{InheritanceModel::Autosomal};
 
     std::filesystem::path ped{};
     std::filesystem::path output{};
@@ -65,19 +69,21 @@ int main(int argc, char *argv[]) {
     #define ADD_OPTION_(name, desc) app.add_option(#name##_opt, args.name, desc, true)
 
     ADD_OPTION_(mu, "Germline mutation rate");
+
     ADD_OPTION_(theta, "Population diversity");
 
     ADD_OPTION_(ref_bias_hom, "Ascertainment bias for reference homozygotes");
     ADD_OPTION_(ref_bias_het, "Ascertainment bias for reference heterozygotes");
     ADD_OPTION_(ref_bias_hap, "Ascertainment bias for reference haploids");
 
-    ADD_OPTION_(seq_error, "Sequencing error rate (per base-call)");
-    ADD_OPTION_(seq_bias, "Sequencing reference bias");
-    ADD_OPTION_(seq_overdisp_hom, "Sequencing overdispersion for homozygotes");
-    ADD_OPTION_(seq_overdisp_het, "Sequencing overdispersion for heterozygotes");
+    // ADD_OPTION_(seq_error, "Sequencing error rate (per base-call)");
+    // ADD_OPTION_(seq_bias, "Sequencing reference bias");
+    // ADD_OPTION_(seq_overdisp_hom, "Sequencing overdispersion for homozygotes");
+    // ADD_OPTION_(seq_overdisp_het, "Sequencing overdispersion for heterozygotes");
 
-    ADD_OPTION_(chr_model, "Chromosomal inheritance model");
     ADD_OPTION_(ped, "Pedigree file");
+    ADD_OPTION_(chr_model, "Chromosomal inheritance model")
+        ->transform(CLI::CheckedTransformer(mutk::detail::CHR_MODEL_MAP, CLI::ignore_case));
 
     ADD_OPTION_(output, "Output file");
 
@@ -87,7 +93,21 @@ int main(int argc, char *argv[]) {
 
     CLI11_PARSE(app, argc, argv);
 
+    mutk::BcfReader reader{args.input};
 
+    auto samples = reader.samples();
+
+    std::vector<const char*> known_samples(samples.first, samples.first+samples.second);
+
+    auto pedigree = mutk::Pedigree::parse_file(args.ped);
+
+    mutk::RelationshipGraph graph;
+    graph.ConstructGraph(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
+
+    graph.ConstructPeeler();
+
+    int iret = reader.SetSamples(graph.SampleNames());
+    assert(iret != 0);
 
     return EXIT_SUCCESS;
 }

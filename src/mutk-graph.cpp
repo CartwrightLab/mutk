@@ -54,13 +54,13 @@ int main(int argc, char *argv[]) {
 
     using namespace mutk::subcommand::string_literals;
 
-    CLI::App app{"mutk modelfit v" MUTK_VERSION};
+    CLI::App app{"mutk graph v" MUTK_VERSION};
 
     #define ADD_OPTION_(name, desc) app.add_option(#name##_opt, args.name, desc, true)
 
     ADD_OPTION_(mu, "Germline mutation rate");
-    ADD_OPTION_(ped, "Pedigree file");
 
+    ADD_OPTION_(ped, "Pedigree file");
     ADD_OPTION_(chr_model, "Chromosomal inheritance model")
         ->transform(CLI::CheckedTransformer(mutk::detail::CHR_MODEL_MAP, CLI::ignore_case));
 

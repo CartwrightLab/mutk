@@ -35,6 +35,7 @@
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/algorithm/fill.hpp>
 #include <boost/range/algorithm/find.hpp>
+#include <boost/range/numeric.hpp>
 
 #include <cmath>
 #include <string>
@@ -90,6 +91,7 @@ struct potential_t {
 struct workspace_t {
     std::vector<mutk::Tensor<1>> stack;
     std::array<std::size_t,3> widths;
+    float scale;
 };
 
 } //namespace detail
@@ -113,6 +115,7 @@ public:
 
     void ConstructPeeler();
 
+    float PeelForward(workspace_t *work) const;
 
     void PrintGraph(std::ostream &os) const;
 
@@ -137,8 +140,15 @@ protected:
     // The probability potentials of the relationship graph
     std::vector<potential_t> potentials_;
 
+    // Elimination Rank
+    std::vector<std::size_t> elimination_rank_;
+
+    // Peeling Operations
     using peeling_t = std::unique_ptr<PeelingVertex>;
-    std::vector<peeling_t> peeling_vertexes_;
+    std::vector<peeling_t> peelers_;
+
+    // location of root data in peelers
+    std::vector<size_t> roots_;
 
 private:
 
@@ -281,11 +291,13 @@ void GeneralPeelingVertex<N>::Forward(PeelingVertex::workspace_t *work) const {
     auto msg_dims = detail::calc_dims(*work, output_data_.data_ploidy);
     std::vector<typename tensor_t::Index> sum_dims;
 
-    for(typename tensor_t::Index i=0; i < msg_dims.size(); ++i) {
-        if(msg_dims[i] == 1) {
+    for(typename tensor_t::Index i=0; i < output_data_.data_ploidy.size(); ++i) {
+        if(output_data_.data_ploidy[i] == 0) {
             sum_dims.push_back(i);
         }
     }
+
+    work->stack[output_data_.index].resize(msg_dims.TotalSize());
     switch(sum_dims.size()) {
     case 0:
         work->stack[output_data_.index] = work->stack[buffer_.index];
@@ -311,6 +323,13 @@ void GeneralPeelingVertex<N>::Forward(PeelingVertex::workspace_t *work) const {
                     .sum(detail::dims_t<3>{sum_dims[0],sum_dims[1],sum_dims[2]}).reshape(msg_dims);            
             break;
         }
+    case 4:
+        if constexpr( N >= 4 ) {
+            work->stack[output_data_.index].reshape(msg_dims) =
+                work->stack[buffer_.index].reshape(dims)
+                    .sum(detail::dims_t<4>{sum_dims[0],sum_dims[1],sum_dims[2],sum_dims[3]}).reshape(msg_dims);            
+            break;
+        }        
     default:
         assert(false);
     };
