@@ -27,15 +27,55 @@
 
 #include <mutk/memory.hpp>
 
+#include <boost/container/static_vector.hpp>
+
 namespace mutk {
+
+namespace detail {
+enum struct Potential {
+    Unit,                // All ones
+    LikelihoodDiploid,   // P(Data|G)
+    LikelihoodHaploid,   // P(Data|H)
+    FounderDiploid,      // P(G)
+    FounderHaploid,      // P(H)
+    CloneDiploid,        // P(G1|G2)
+    CloneHaploid,        // P(H1|H2)
+    GameteDiploid,       // P(H1|G2)
+    ChildDiploidDiploid, // P(G1|G2,G3)
+    ChildHaploidDiploid, // P(G1|H2,G3)
+    ChildDiploidHaploid, // P(G1|G2,H3)
+    ChildHaploidHaploid, // P(G1|H1,H2)
+    ChildSelfingDiploid, // P(G1|G2,G2)
+    ChildSelfingHaploid  // P(G1|H2,H2)
+};
+
+struct potential_t {
+    Potential type;
+    int child;
+    using data_t = std::pair<int,float>;
+    boost::container::static_vector<data_t, 2> parents;
+
+    potential_t() = default;
+    potential_t(Potential type_arg, int child_arg) : type{type_arg}, child{child_arg} {}
+    potential_t(Potential type_arg, int child_arg, int par1, float dist1) :
+        type{type_arg}, child{child_arg}, parents{{par1,dist1}} {}
+    potential_t(Potential type_arg, int child_arg, int par1, float dist1, int par2, float dist2) :
+        type{type_arg}, child{child_arg}, parents{{par1,dist1},{par2,dist2}} {}
+};
+} // namespace detail
+
 namespace mutation {
 
 class Model {
 public:
     using tensor_t = mutk::Tensor<2>;
+    using potential_t = mutk::detail::potential_t;
+
     virtual tensor_t TransitionMatrix(float t, int n) const = 0;
     virtual tensor_t EventTransitionMatrix(float t, int n, int x) const = 0;
     virtual tensor_t MeanTransitionMatrix(float t, int n) const = 0;
+
+    mutk::Tensor<1> CreatePotential(int n, const potential_t &potential);
 };
 
 // A k-alleles model. See Lewis 2001 and Tuffley and Steel 1997.

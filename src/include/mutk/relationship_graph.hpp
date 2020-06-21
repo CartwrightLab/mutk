@@ -30,8 +30,8 @@
 #include <mutk/detail/graph.hpp>
 #include <mutk/pedigree.hpp>
 #include <mutk/memory.hpp>
+#include <mutk/mutation.hpp>
 
-#include <boost/container/static_vector.hpp>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/algorithm/fill.hpp>
 #include <boost/range/algorithm/find.hpp>
@@ -56,37 +56,6 @@ enum struct InheritanceModel {
 
 namespace detail {
 extern const std::map<std::string, InheritanceModel> CHR_MODEL_MAP;
-
-enum struct Potential {
-    Unit,                // All ones
-    LikelihoodDiploid,   // P(Data|G)
-    LikelihoodHaploid,   // P(Data|H)
-    FounderDiploid,      // P(G)
-    FounderHaploid,      // P(H)
-    CloneDiploid,        // P(G1|G2)
-    CloneHaploid,        // P(H1|H2)
-    GameteDiploid,       // P(H1|G2)
-    ChildDiploidDiploid, // P(G1|G2,G3)
-    ChildHaploidDiploid, // P(G1|H2,G3)
-    ChildDiploidHaploid, // P(G1|G2,H3)
-    ChildHaploidHaploid, // P(G1|H1,H2)
-    ChildSelfingDiploid, // P(G1|G2,G2)
-    ChildSelfingHaploid  // P(G1|H2,H2)
-};
-
-struct potential_t {
-    Potential type;
-    int child;
-    using data_t = std::pair<int,float>;
-    boost::container::static_vector<data_t, 2> parents;
-
-    potential_t() = default;
-    potential_t(Potential type_arg, int child_arg) : type{type_arg}, child{child_arg} {}
-    potential_t(Potential type_arg, int child_arg, int par1, float dist1) :
-        type{type_arg}, child{child_arg}, parents{{par1,dist1}} {}
-    potential_t(Potential type_arg, int child_arg, int par1, float dist1, int par2, float dist2) :
-        type{type_arg}, child{child_arg}, parents{{par1,dist1},{par2,dist2}} {}
-};
 
 struct workspace_t {
     std::vector<mutk::Tensor<1>> stack;

@@ -40,11 +40,11 @@ namespace mutk {
 template<std::size_t N>
 using Tensor = Eigen::Tensor<float,N>;
 
-// template<typename ...Args>
-// typename Tensor<sizeof...(Args)>::Dimensions
-// tensor_dims(Args... args) {
-//     return {args...};
-// }
+template<typename Arg1, typename ...Args>
+typename Eigen::array<Eigen::DenseIndex,1+sizeof...(Args)>
+tensor_dims(Arg1 arg1, Args... args) {
+    return {arg1,args...};
+}
 
 template<typename Arg1, typename ...Args>
 auto wrap_tensor(float *p, Arg1 arg1, Args... args) {
