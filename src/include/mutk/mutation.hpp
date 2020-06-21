@@ -75,111 +75,62 @@ constexpr mean_t MEAN = {};
 
 class Model {
 public:
-    using tensor_t = mutk::Tensor<2>;
+    using tensor_t = mutk::Tensor<1>;
+    using matrix_t = mutk::Tensor<2>;
     using potential_t = mutk::detail::potential_t;
 
-    virtual tensor_t CreateMatrix(int n, float t, any_t) const = 0;
-    virtual tensor_t CreateMatrix(int n, float t, mean_t) const = 0;
-    virtual tensor_t CreateMatrix(int n, float t, int x) const = 0;
+    virtual matrix_t CreateMatrix(int n, float t, any_t) const = 0;
+    virtual matrix_t CreateMatrix(int n, float t, mean_t) const = 0;
+    virtual matrix_t CreateMatrix(int n, float t, int x) const = 0;
+
+    virtual tensor_t CreatePrior(int n, int ploidy) const = 0;
 
     mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, any_t);
+    mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, mean_t);
+    mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, int x);
 };
 
 // A k-alleles model. See Lewis 2001 and Tuffley and Steel 1997.
 class KAllelesModel : public Model {
 public:
     using tensor_t = Model::tensor_t;
+    using matrix_t = Model::matrix_t;
 
-    KAllelesModel(double k) : k_{k} {
-        assert(k_ >= 2.0);        
+    KAllelesModel(double k, double theta, double hom_bias, double het_bias, double hap_bias) : 
+        k_{k}, theta_{theta}, hom_bias_{hom_bias}, het_bias_{het_bias}, hap_bias_{hap_bias} {
+
+        double e = theta/(k-1.0);
+
+        if(k < 2.0) {
+            throw std::invalid_argument("Invalid k parameter.");
+        }
+        if(theta < 0) {
+            throw std::invalid_argument("Invalid theta parameter");
+        }
+        if(hom_bias > 1.0 || hom_bias < -(2.0+e)/((k-1.0)*e)) {
+            throw std::invalid_argument("Invalid hom_bias parameter.");
+        }
+        if(het_bias > 1.0 || het_bias < -(2.0+2.0*e)/((k-2.0)*e)) {
+            throw std::invalid_argument("Invalid het_bias parameter.");
+        }
+        if(hap_bias > 1.0 || hap_bias < -(1.0+e)/((k-1.0)*e)) {
+            throw std::invalid_argument("Invalid hap_bias parameter.");
+        }
     }
 
-    virtual tensor_t CreateMatrix(int n, float t, any_t) const override;
-    virtual tensor_t CreateMatrix(int n, float t, mean_t) const override;
-    virtual tensor_t CreateMatrix(int n, float t, int x) const override;
+    virtual matrix_t CreateMatrix(int n, float t, any_t) const override;
+    virtual matrix_t CreateMatrix(int n, float t, mean_t) const override;
+    virtual matrix_t CreateMatrix(int n, float t, int x) const override;
+
+    virtual tensor_t CreatePrior(int n, int ploidy) const override;
 
 protected:
     double k_;
+    double theta_;
+    double hom_bias_;
+    double het_bias_;
+    double hap_bias_;
 };
-
-
-
-/*
-// k-alleles model from Watterson and Guess (1977) https://doi.org/10.1016/0040-5809(77)90023-5
-
-inline
-tensor_t population_prior_diploid(int num_obs_alleles, double theta, double hom_bias, double het_bias,
-    double kalleles) {
-    assert(num_obs_alleles >= 0);
-
-    double k = kalleles;
-    double e = theta/(k-1.0);
-
-    double p_hom = (1.0+e)/(1.0+k*e);
-    double p_hetk = e/(1.0+k*e);
-
-    double p_RR = p_hom*(2.0+e+(k-1.0)*e*hom_bias)/(2.0+k*e);
-    double p_AA = p_hom*(e-e*hom_bias)/(2.0+k*e);
-
-    double p_RA = p_hetk*(2.0+2.0*e+(k-2.0)*e*het_bias)/(2.0+k*e);
-    double p_AB = p_hetk*(2.0*e-2.0*e*het_bias)/(2.0+k*e);
-
-    tensor_t ret{num_obs_alleles*(num_obs_alleles+1)/2};
-
-    int n=0;
-    for(int i=0;i<num_obs_alleles;++i) {
-        for(int j=0;j<i;++j) {
-            ret(n++) = (j==0 || i==0) ? p_RA : p_AB;
-        }
-        ret(n++) = (i==0) ? p_RR : p_AA;
-    }
-
-    return ret;
-}
-
-inline
-tensor_t population_prior_haploid(int num_obs_alleles, double theta, double hap_bias,
-    double kalleles) {
-    assert(num_obs_alleles >= 1);
-
-    double k = kalleles;
-    double e = theta/(k-1.0);
-
-    double p_R = (1.0+e+(k-1.0)*e*hap_bias)/(1.0+k*e);
-    double p_A = (e-e*hap_bias)/(1.0+k*e);
-
-    tensor_t ret{num_obs_alleles};
-    ret(0) = p_R;
-    for(int n=1;n<num_obs_alleles;++n) {
-        ret(n) = p_A;
-    }
-
-    return ret;
-}
-
-inline bool population_prior_check(double theta, double hom_bias, double het_bias, double hap_bias, double kalleles) {
-    double k = kalleles;
-    double e = theta/(k-1.0);
-
-    if(e < 0) {
-        return false;
-    }
-    if(k < 2.0) {
-        return false;
-    }
-    if(hom_bias > 1.0 || hom_bias < -(2.0+e)/((k-1.0)*e)) {
-        return false;
-    }
-    if(het_bias > 1.0 || het_bias < -(2.0+2.0*e)/((k-2.0)*e)) {
-        return false;
-    }
-    if(hap_bias > 1.0 || hap_bias < -(1.0+e)/((k-1.0)*e)) {
-        return false;
-    }
-    return true;
-}
-
-*/
 
 } // namespace mutation
 } // namespace mutk
