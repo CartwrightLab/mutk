@@ -40,8 +40,27 @@ namespace mutk {
 template<std::size_t N>
 using Tensor = Eigen::Tensor<float,N>;
 
+// template<typename ...Args>
+// typename Tensor<sizeof...(Args)>::Dimensions
+// tensor_dims(Args... args) {
+//     return {args...};
+// }
 
+template<typename Arg1, typename ...Args>
+auto wrap_tensor(float *p, Arg1 arg1, Args... args) {
+    return Eigen::TensorMap<Eigen::Tensor<float,1+sizeof...(Args)>>(p,
+        arg1, args...);
+}
 
+template<typename Arg, std::enable_if_t<std::is_integral<Arg>::value, int> = 0>
+auto wrap_tensor(float *p, Arg arg) {
+    return Eigen::TensorMap<Eigen::Tensor<float,1>>(p, arg);
+}
+
+template<typename Arg, std::enable_if_t<std::is_class<Arg>::value, int> = 0>
+auto wrap_tensor(float *p, Arg arg) {
+    return Eigen::TensorMap<Eigen::Tensor<float,arg.size()>>(p, arg);
+}
 
 template<typename A, typename B>
 inline auto kronecker_product_coef(const A &a, const B &b, std::size_t i,

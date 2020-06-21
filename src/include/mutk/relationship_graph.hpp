@@ -212,12 +212,10 @@ protected:
 };
 
 namespace detail {
-template<std::size_t N>
-using dims_t = typename mutk::Tensor<N>::Dimensions;
 
 template<typename A>
 auto calc_dims(const PeelingVertex::workspace_t &work, A a) {
-    dims_t<a.size()> ret;
+    typename mutk::Tensor<a.size()>::Dimensions ret;
     std::transform(a.begin(), a.end(), ret.begin(), [&](auto v) {
         return work.widths[v];
     });
@@ -306,28 +304,28 @@ void GeneralPeelingVertex<N>::Forward(PeelingVertex::workspace_t *work) const {
         if constexpr( N >= 1 ) {
             work->stack[output_data_.index].reshape(msg_dims) =
                 work->stack[buffer_.index].reshape(dims)
-                    .sum(detail::dims_t<1>{sum_dims[0]}).reshape(msg_dims);
+                    .sum(Eigen::make_index_list(sum_dims[0])).reshape(msg_dims);
             break;
         }
     case 2:
         if constexpr( N >= 2 ) {
             work->stack[output_data_.index].reshape(msg_dims) =
                 work->stack[buffer_.index].reshape(dims)
-                    .sum(detail::dims_t<2>{sum_dims[0],sum_dims[1]}).reshape(msg_dims);
+                    .sum(Eigen::make_index_list(sum_dims[0],sum_dims[1])).reshape(msg_dims);
             break;            
         }
     case 3:
         if constexpr( N >= 3 ) {
             work->stack[output_data_.index].reshape(msg_dims) =
                 work->stack[buffer_.index].reshape(dims)
-                    .sum(detail::dims_t<3>{sum_dims[0],sum_dims[1],sum_dims[2]}).reshape(msg_dims);            
+                    .sum(Eigen::make_index_list(sum_dims[0],sum_dims[1],sum_dims[2])).reshape(msg_dims);            
             break;
         }
     case 4:
         if constexpr( N >= 4 ) {
             work->stack[output_data_.index].reshape(msg_dims) =
                 work->stack[buffer_.index].reshape(dims)
-                    .sum(detail::dims_t<4>{sum_dims[0],sum_dims[1],sum_dims[2],sum_dims[3]}).reshape(msg_dims);            
+                    .sum(Eigen::make_index_list(sum_dims[0],sum_dims[1],sum_dims[2],sum_dims[3])).reshape(msg_dims);            
             break;
         }        
     default:

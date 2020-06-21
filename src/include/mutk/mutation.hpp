@@ -30,119 +30,55 @@
 namespace mutk {
 namespace mutation {
 
-/*
-  C H I L D
-P
-A
-R  matrix_t
-E
-N
-T
-*/
-
-/* A k-alleles model. See Lewis 2001 and Tuffley and Steel 1997.
- */
-
 class Model {
 public:
-    Model(double u, double k) : u_{u}, k_{k} {
-        assert(u_ >= 0.0);
-        assert(k_ >= 2.0); 
+    using tensor_t = mutk::Tensor<2>;
+    virtual tensor_t TransitionMatrix(float t, int n) const = 0;
+    virtual tensor_t EventTransitionMatrix(float t, int n, int x) const = 0;
+    virtual tensor_t MeanTransitionMatrix(float t, int n) const = 0;
+};
+
+// A k-alleles model. See Lewis 2001 and Tuffley and Steel 1997.
+class KAllelesModel : public Model {
+public:
+    using tensor_t = Model::tensor_t;
+
+    KAllelesModel(double k) : k_{k} {
+        assert(k_ >= 2.0);        
     }
 
-    matrix_t TransitionMatrix(int n);
-    matrix_t EventTransitionMatrix(int n, int x);
-    matrix_t MeanTransitionMatrix(int n);
+    virtual tensor_t TransitionMatrix(float t, int n) const override;
+    virtual tensor_t EventTransitionMatrix(float t, int n, int x) const override;
+    virtual tensor_t MeanTransitionMatrix(float t, int n) const override;
 
 protected:
-    double u_;
     double k_;
 };
 
 
-// ret(j,i) = P(i|j)
-inline
-matrix_t Model::TransitionMatrix(int n) {
-    assert(n > 0);
 
-    matrix_t ret{n,n};
-    double beta = u_*k_/(k_-1.0);
-    double p_ji = -1.0/k_*expm1(-beta);
-    double p_jj = exp(-beta) + p_ji;
-
-    for(int i=0;i<n;++i) {
-        for(int j=0;j<n;++j) {
-            ret(j,i) = (i == j) ? p_jj : p_ji;
-        }
-    }
-    return ret;    
-}
-
-// ret(j,i) = P(i & x mutations | j)
-inline
-matrix_t Model::EventTransitionMatrix(int n, int x) {
-    assert(n > 0);
-    assert(x >= 0);
-    matrix_t ret{n,n};
-    
-    double p_x;
-    if(u_ == 0.0) {
-        p_x = (x==0) ? 1.0 : 0.0;
-    } else {
-        p_x = exp(-u_+x*log(u_)-lgamma(x+1));
-    }
-
-    double p_ji = (1.0-pow(-1.0/(k_-1.0),x))/k_;
-    double p_jj = (1.0+(k_-1.0)*pow(-1.0/(k_-1.0),x))/k_;
-
-    for(int i=0;i<n;++i) {
-        for(int j=0;j<n;++j) {
-            ret(j,i) = (i == j) ? p_x*p_jj : p_x*p_ji;
-        }
-    }
-    return ret;
-}
-
-// ret(j,i) = E[num of mutations | i,j]*P(i|j)
-inline
-matrix_t Model::MeanTransitionMatrix(int n) {
-    assert(n > 0);
-
-    matrix_t ret{n,n};
-
-    double beta = k_*u_/(k_-1.0);
-    double p_jj = -u_/k_*expm1(-beta);
-    double p_ji = (u_-p_jj)/(k_-1.0);
-
-    for(int i=0;i<n;++i) {
-        for(int j=0;j<n;++j) {
-            ret(j,i) = (i == j) ? p_jj : p_ji;
-        }
-    }
-    return ret;
-}
-
+/*
 struct transition_t {};
 struct mean_t {};
 
 inline
-matrix_t mitosis_haploid_matrix(int size, Model m, transition_t) {
+tensor_t mitosis_haploid_matrix(int size, Model m, transition_t) {
     return m.TransitionMatrix(size);
 }
 
 inline
-matrix_t mitosis_haploid_matrix(int size, Model m, mean_t) {
+tensor_t mitosis_haploid_matrix(int size, Model m, mean_t) {
     return m.MeanTransitionMatrix(size);
 }
 
 inline
-matrix_t mitosis_haploid_matrix(int size, Model m, int count) {
+tensor_t mitosis_haploid_matrix(int size, Model m, int count) {
     return m.EventTransitionMatrix(size, count);
 }
 
 namespace detail {
 inline
-void mitosis_diploid_matrix_op(const matrix_t& matA, const matrix_t& matB, matrix_t *p) {
+void mitosis_diploid_matrix_op(const tensor_t& matA, const tensor_t& matB, tensor_t *p) {
     assert(matA.cols() == matA.rows() && matA.cols() > 0);
     assert(matB.cols() == matB.rows() && matB.cols() > 0);
     assert(matA.cols() == matB.cols());
@@ -170,11 +106,11 @@ void mitosis_diploid_matrix_op(const matrix_t& matA, const matrix_t& matB, matri
 } // namespace detail
 
 inline
-matrix_t mitosis_diploid_matrix(int size, Model m, transition_t) {
+tensor_t mitosis_diploid_matrix(int size, Model m, transition_t) {
     assert(size > 0);
     const int num_genotypes = size*(size+1)/2;
     
-    matrix_t ret = matrix_t::Zero(num_genotypes, num_genotypes);
+    tensor_t ret = tensor_t::Zero(num_genotypes, num_genotypes);
 
     auto mat = mitosis_haploid_matrix(size, m, transition_t{});
     detail::mitosis_diploid_matrix_op(mat,mat,&ret);
@@ -183,11 +119,11 @@ matrix_t mitosis_diploid_matrix(int size, Model m, transition_t) {
 }
 
 inline
-matrix_t mitosis_diploid_matrix(int size, Model m, int count) {
+tensor_t mitosis_diploid_matrix(int size, Model m, int count) {
     assert(size > 0);
     const int num_genotypes = size*(size+1)/2;
 
-    matrix_t ret = matrix_t::Zero(num_genotypes, num_genotypes);
+    tensor_t ret = tensor_t::Zero(num_genotypes, num_genotypes);
     
     for(int n=0; n<=count; ++n) {
         auto mat1 = mitosis_haploid_matrix(size, m, n);
@@ -199,12 +135,12 @@ matrix_t mitosis_diploid_matrix(int size, Model m, int count) {
 }
 
 inline
-matrix_t mitosis_diploid_matrix(int size, Model m, mean_t) {
+tensor_t mitosis_diploid_matrix(int size, Model m, mean_t) {
     assert(size > 0);
     const int num_alleles = size;
     const int num_genotypes = num_alleles*(num_alleles+1)/2;
     
-    matrix_t ret = matrix_t::Zero(num_genotypes, num_genotypes);
+    tensor_t ret = tensor_t::Zero(num_genotypes, num_genotypes);
 
     auto mat = mitosis_haploid_matrix(size, m, transition_t{});
     auto avg = mitosis_haploid_matrix(size, m, mean_t{});
@@ -217,7 +153,7 @@ matrix_t mitosis_diploid_matrix(int size, Model m, mean_t) {
 
 namespace detail {
 inline
-void meiosis_haploid_matrix_op(const matrix_t& matA, matrix_t *p) {
+void meiosis_haploid_matrix_op(const tensor_t& matA, tensor_t *p) {
     assert(matA.cols() == matA.rows() && matA.cols() > 0);
 
     const int num_alleles = matA.cols();
@@ -236,11 +172,11 @@ void meiosis_haploid_matrix_op(const matrix_t& matA, matrix_t *p) {
 
 template<typename T>
 inline
-matrix_t meiosis_haploid_matrix(int size, Model m, T arg) {
+tensor_t meiosis_haploid_matrix(int size, Model m, T arg) {
     assert(size > 0);
     const int num_genotypes = size*(size+1)/2;
     
-    matrix_t ret = matrix_t::Zero(num_genotypes, size);
+    tensor_t ret = tensor_t::Zero(num_genotypes, size);
 
     auto mat = mitosis_haploid_matrix(size, m, arg);
     detail::meiosis_haploid_matrix_op(mat, &ret);
@@ -250,7 +186,7 @@ matrix_t meiosis_haploid_matrix(int size, Model m, T arg) {
 
 template<typename T>
 inline
-matrix_t mitosis_matrix(int size, Model m, T arg, int parent_ploidy) {
+tensor_t mitosis_matrix(int size, Model m, T arg, int parent_ploidy) {
     assert(parent_ploidy == 1 || parent_ploidy == 2);
     if(parent_ploidy == 1) {
         return mitosis_haploid_matrix(size, m, arg);
@@ -260,7 +196,7 @@ matrix_t mitosis_matrix(int size, Model m, T arg, int parent_ploidy) {
 
 template<typename T>
 inline
-matrix_t gamete_matrix(int size, Model m, T arg, int parent_ploidy) {
+tensor_t gamete_matrix(int size, Model m, T arg, int parent_ploidy) {
     assert(parent_ploidy == 1 || parent_ploidy == 2);
     if(parent_ploidy == 1) {
         return mitosis_haploid_matrix(size, m, arg);
@@ -282,7 +218,7 @@ int number_of_parent_genotype_pairs(const int num_alleles, const int dad_ploidy,
 
 namespace detail {
 inline
-void meiosis_matrix_op(const matrix_t& matA, const matrix_t& matB, matrix_t *p) {
+void meiosis_matrix_op(const tensor_t& matA, const tensor_t& matB, tensor_t *p) {
     assert(matA.cols() == matB.cols());
 
     const int num_alleles = matA.cols();
@@ -295,7 +231,7 @@ void meiosis_matrix_op(const matrix_t& matA, const matrix_t& matB, matrix_t *p) 
         for(int b=0; b <= a; ++b, ++i) {
             for(int x=0,j=0; x < matA.rows(); ++x) { // loop over all parent genotypes
                 for(int y=0; y < matB.rows(); ++y,++j) {
-                    // fold the matrix_t
+                    // fold the tensor_t
                     (*p)(j,i) += matA(x,a) * matB(y,b);
                     if(b != a) {
                         (*p)(j,i) += matA(x,b) * matB(y,a);
@@ -308,7 +244,7 @@ void meiosis_matrix_op(const matrix_t& matA, const matrix_t& matB, matrix_t *p) 
 } // detail
 
 inline
-matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, transition_t, int dad_ploidy, int mom_ploidy) {
+tensor_t meiosis_matrix(int size, Model dad_m, Model mom_m, transition_t, int dad_ploidy, int mom_ploidy) {
     assert(dad_ploidy == 1 || dad_ploidy == 2);
     assert(mom_ploidy == 1 || mom_ploidy == 2);
 
@@ -316,7 +252,7 @@ matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, transition_t, int da
     const int num_genotypes = num_alleles*(num_alleles+1)/2;
 
     // Construct Mutation Process
-    matrix_t ret = matrix_t::Zero(number_of_parent_genotype_pairs(num_alleles,
+    tensor_t ret = tensor_t::Zero(number_of_parent_genotype_pairs(num_alleles,
             dad_ploidy, mom_ploidy), num_genotypes);
     auto dad = gamete_matrix(size, dad_m, transition_t{}, dad_ploidy);
     auto mom = gamete_matrix(size, mom_m, transition_t{}, mom_ploidy);
@@ -326,7 +262,7 @@ matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, transition_t, int da
 }
 
 inline
-matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, mean_t, int dad_ploidy, int mom_ploidy) {
+tensor_t meiosis_matrix(int size, Model dad_m, Model mom_m, mean_t, int dad_ploidy, int mom_ploidy) {
     assert(dad_ploidy == 1 || dad_ploidy == 2);
     assert(mom_ploidy == 1 || mom_ploidy == 2);
 
@@ -334,7 +270,7 @@ matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, mean_t, int dad_ploi
     const int num_genotypes = num_alleles*(num_alleles+1)/2;
 
     // Construct Mutation Process
-    matrix_t ret = matrix_t::Zero(number_of_parent_genotype_pairs(num_alleles,
+    tensor_t ret = tensor_t::Zero(number_of_parent_genotype_pairs(num_alleles,
             dad_ploidy, mom_ploidy), num_genotypes);
 
     auto dad = gamete_matrix(size, dad_m, transition_t{}, dad_ploidy);
@@ -348,7 +284,7 @@ matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, mean_t, int dad_ploi
 }
 
 inline
-matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, int count, int dad_ploidy, int mom_ploidy) {
+tensor_t meiosis_matrix(int size, Model dad_m, Model mom_m, int count, int dad_ploidy, int mom_ploidy) {
     assert(dad_ploidy == 1 || dad_ploidy == 2);
     assert(mom_ploidy == 1 || mom_ploidy == 2);
 
@@ -356,7 +292,7 @@ matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, int count, int dad_p
     const int num_genotypes = num_alleles*(num_alleles+1)/2;
 
     // Construct Mutation Process
-    matrix_t ret = matrix_t::Zero(number_of_parent_genotype_pairs(num_alleles,
+    tensor_t ret = tensor_t::Zero(number_of_parent_genotype_pairs(num_alleles,
             dad_ploidy, mom_ploidy), num_genotypes);
 
    for(int n=0; n<=count; ++n) {
@@ -371,7 +307,7 @@ matrix_t meiosis_matrix(int size, Model dad_m, Model mom_m, int count, int dad_p
 // k-alleles model from Watterson and Guess (1977) https://doi.org/10.1016/0040-5809(77)90023-5
 
 inline
-matrix_t population_prior_diploid(int num_obs_alleles, double theta, double hom_bias, double het_bias,
+tensor_t population_prior_diploid(int num_obs_alleles, double theta, double hom_bias, double het_bias,
     double kalleles) {
     assert(num_obs_alleles >= 0);
 
@@ -387,7 +323,7 @@ matrix_t population_prior_diploid(int num_obs_alleles, double theta, double hom_
     double p_RA = p_hetk*(2.0+2.0*e+(k-2.0)*e*het_bias)/(2.0+k*e);
     double p_AB = p_hetk*(2.0*e-2.0*e*het_bias)/(2.0+k*e);
 
-    matrix_t ret{num_obs_alleles*(num_obs_alleles+1)/2};
+    tensor_t ret{num_obs_alleles*(num_obs_alleles+1)/2};
 
     int n=0;
     for(int i=0;i<num_obs_alleles;++i) {
@@ -401,7 +337,7 @@ matrix_t population_prior_diploid(int num_obs_alleles, double theta, double hom_
 }
 
 inline
-matrix_t population_prior_haploid(int num_obs_alleles, double theta, double hap_bias,
+tensor_t population_prior_haploid(int num_obs_alleles, double theta, double hap_bias,
     double kalleles) {
     assert(num_obs_alleles >= 1);
 
@@ -411,7 +347,7 @@ matrix_t population_prior_haploid(int num_obs_alleles, double theta, double hap_
     double p_R = (1.0+e+(k-1.0)*e*hap_bias)/(1.0+k*e);
     double p_A = (e-e*hap_bias)/(1.0+k*e);
 
-    matrix_t ret{num_obs_alleles};
+    tensor_t ret{num_obs_alleles};
     ret(0) = p_R;
     for(int n=1;n<num_obs_alleles;++n) {
         ret(n) = p_A;
@@ -441,6 +377,8 @@ inline bool population_prior_check(double theta, double hom_bias, double het_bia
     }
     return true;
 }
+
+*/
 
 } // namespace mutation
 } // namespace mutk
