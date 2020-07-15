@@ -28,6 +28,8 @@
 #include <mutk/mutk.hpp>
 #include <mutk/vcf.hpp>
 #include <mutk/relationship_graph.hpp>
+#include <mutk/memory.hpp>
+#include <mutk/utility.hpp>
 
 #include <CLI11.hpp>
 
@@ -36,6 +38,7 @@
 using namespace std::string_literals;
 
 using InheritanceModel = mutk::InheritanceModel;
+using Potential = mutk::RelationshipGraph::Potential;
 
 namespace {
 struct args_t {
@@ -56,13 +59,15 @@ struct args_t {
     std::filesystem::path ped{};
     std::filesystem::path output{};
     std::filesystem::path input{};
-} args;
+};
 }  // anon namespace
 
 int main(int argc, char *argv[]) {
     MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
     using namespace mutk::subcommand::string_literals;
+
+    args_t args;
 
     CLI::App app{"mutk modelfit v" MUTK_VERSION};
 
@@ -93,7 +98,7 @@ int main(int argc, char *argv[]) {
 
     CLI11_PARSE(app, argc, argv);
 
-    mutk::BcfReader reader{args.input};
+    mutk::vcf::Reader reader{args.input};
 
     auto samples = reader.samples();
 
@@ -107,9 +112,125 @@ int main(int argc, char *argv[]) {
     graph.ConstructPeeler();
 
     int iret = reader.SetSamples(graph.SampleNames());
-    assert(iret != 0);
+    assert(iret == 0);
 
-    
+    // allocate space for PL data
+    int num_samples = reader.samples().second;
+    int n_pl_capacity = 15*num_samples;
+    auto pl_buf = mutk::vcf::make_buffer<int>(n_pl_capacity);
+
+    // allocate workspace
+    auto work = graph.CreateWorkspace();
+
+    mutk::mutation::KAllelesModel model(5.0, args.theta,
+        args.ref_bias_hom, args.ref_bias_het, args.ref_bias_hap);
+
+    reader([&](const bcf_hdr_t *header, bcf1_t *record) {
+        if(record->n_allele > 5) {
+            // we currently do not support locations with more than
+            // five alleles
+            return;
+        }
+        bcf_unpack(record, BCF_UN_ALL);
+
+        int n_pl = mutk::vcf::get_format_int32(header, record, "PL", &pl_buf);
+        if(n_pl <= 0) {
+            // PL tag is missing, so we do nothing at this time
+            return;
+        }
+        const int num_genotypes = n_pl / num_samples;
+        assert(n_pl % num_samples == 0);
+        
+        auto pl = mutk::wrap_tensor(pl_buf.data.get(), num_genotypes, num_samples);
+
+        mutk::tensor_index_t haploid_sz = mutk::dim_width<1>(record->n_allele);
+        mutk::tensor_index_t diploid_sz = mutk::dim_width<2>(record->n_allele);
+
+        auto founder1 = model.CreatePriorHaploid(haploid_sz);
+        auto founder2 = model.CreatePriorDiploid(haploid_sz);
+
+        work.widths = {1, haploid_sz, diploid_sz};
+
+        using mutk::utility::unphredf;
+        for(int i=0; i < graph.potentials().size(); ++i) {
+            const auto &pot = graph.potentials()[i];
+            if(pot.type == Potential::LikelihoodDiploid) {
+                work.stack[i].resize(diploid_sz);
+                // check for missing data
+                if(mutk::vcf::is_missing(pl(i,0))) {
+                    // If PLs are missing for this site, set everything to 1.
+                    work.stack[i].setConstant(1.0f);
+                } else {                
+                    int width = 0;
+                    for(;width < num_genotypes; ++width) {
+                        if(mutk::vcf::is_vector_end(pl(i,width))) {
+                            break;
+                        }
+                    }
+                    if(width != diploid_sz) {
+                        // PL tag is not wide enough, we will skip the site
+                        return;
+                    }
+                    for(int k=0; k < diploid_sz; ++k) {
+                        assert(!mutk::vcf::is_missing(pl(i,k)));
+                        work.stack[i](k) = unphredf(pl(i,k));
+                    }
+                }
+            } else if(pot.type == Potential::LikelihoodHaploid) {
+                work.stack[i].resize(haploid_sz);
+                // check for missing data
+                if(mutk::vcf::is_missing(pl(i,0))) {
+                    // If PLs are missing for this site, set everything to 1.
+                    work.stack[i].setConstant(1.0f);
+                } else {
+                    // Measure the number of genotype of this
+                    int width = 0;
+                    for(;width < num_genotypes; ++width) {
+                        if(mutk::vcf::is_vector_end(pl(i,width))) {
+                            break;
+                        }
+                    }
+                    if(width == haploid_sz) {
+                        // haploid PLs are encoded directly
+                        for(int k=0; k < haploid_sz; ++k) {
+                            work.stack[i](k) = unphredf(pl(i,k));
+                        }
+                    } else if(width == diploid_sz) {
+                        // haploid PLs are encoded as homozygous diploids
+                        int m = 0;
+                        for(int k=0; k < haploid_sz; ++k) {
+                            work.stack[i](k) = unphredf(pl(i,m));
+                            m += k+2;
+                        }
+                    } else {
+                        // PL tag is not wide enough, we will skip the site
+                        return;
+                    }
+                }
+            } else if(pot.type == Potential::FounderDiploid) {
+                work.stack[i] = founder2;
+            } else if(pot.type == Potential::FounderHaploid) {
+                work.stack[i] = founder1;
+            } else {
+                work.stack[i] = model.CreatePotential(haploid_sz, pot, mutk::mutation::ANY);
+            }
+        }
+        float value = graph.PeelForward(&work);
+        std::cout << record->rid << " " << record->pos << " " << value << "\n";
+    });
+
+    // Go thorough the likelihood potentials and fill them with data from PL
+    //    (1) If the likelihood is haploid, will need to check if it is encoded as a diploid.
+    //    (2) If first element of a column is missing, fill the liklehood with 1s.
+    //    (3) Convert PLs to normalized probabilities.
+
+    // Initialize the priors based on n.
+    // Initialize the mutation matrices based on n.
+
+    // Store dimensions of unit matrices
+    // Store founders and mutation matrices by value of n.
+    // reshape potentials by elimination order
+
 
     return EXIT_SUCCESS;
 }

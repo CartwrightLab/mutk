@@ -29,6 +29,8 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <cmath>
+#include <cfloat>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/tokenizer.hpp>
@@ -232,6 +234,50 @@ std::optional<std::basic_string<X,T,A>> slurp(std::basic_ifstream<X,T>& input) {
 inline std::optional<std::string> slurp(const std::filesystem::path& path, std::ios_base::openmode mode = std::ios_base::in) {
     std::ifstream in{path,mode};
     return slurp(in);
+}
+
+/*
+  Phred scaled numbers: -10.0*log10(a)
+  
+  DBL_MIN -> 3076.52655568588761525
+  DBL_SUBNORM_MIN -> 3233.06215343115809446
+  1-(1-2^-53) -> 159.54589770191000753
+*/
+
+inline float unphredf(int v) {
+    // The compiler will optimize this as a constant float.
+    constexpr float k = (-M_LN10/10.0);
+    return expf(k*v);
+}
+
+// -10*log10(a)
+inline double phred(double a) {
+    return -10.0 * std::log10(a);
+}
+
+inline double unphred(double v) {
+    return std::exp(v*(-M_LN10/10.0));
+}
+
+// -10*log10(1+p)
+inline double phred1m(double p) {
+    return (-10.0/M_LN10) * std::log1p(-p);
+}
+
+inline double unphred1m(double v) {
+    return -std::expm1(v*(-M_LN10/10.0));
+}
+
+template<typename T>
+inline T lphred(double a, T m = std::numeric_limits<T>::max()) {
+    double q = std::round( -10.0 * std::log10(a) );
+    return (q > m) ? m : static_cast<T>(q);
+}
+
+template<typename T>
+inline T lphred1m(double p, T m = std::numeric_limits<T>::max()) {
+    double q = std::round( (-10.0/M_LN10) * std::log1p(-p) );
+    return (q > m) ? m : static_cast<T>(q);
 }
 
 } // namespace utility

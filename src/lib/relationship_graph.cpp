@@ -117,8 +117,8 @@ float mutk::RelationshipGraph::PeelForward(workspace_t *work) const {
     float log_ret = work->scale;
 
     for(auto r : roots_) {
-        assert(work->stack[r].size() == 1);
-        log_ret += log(work->stack[r][0]);
+        mutk::Tensor<0> s = work->stack[r].sum();
+        log_ret += log(s(0));
     }
     return log_ret;
 }
@@ -201,55 +201,72 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     // build a container that aligns a set of graph vertices with a node in the
     // junction tree
     boost::container::flat_map<junction_tree::neighbors_t,junction_tree::vertex_t>
-        map_labels_to_nodes;
-    auto node_labels = get(boost::vertex_label, junction_tree_);
+        map_labels_to_jctnodes;
+    auto jctnode_labels = get(boost::vertex_label, junction_tree_);
     for(junction_tree::vertex_t v = 0; v < num_vertices(junction_tree_); ++v) {
-        map_labels_to_nodes[node_labels[v]] = v;
+        map_labels_to_jctnodes[jctnode_labels[v]] = v;
     }
     // construct the set of graph vertices for each potential, and lookup the
     // junction tree node corresponding to the set.
-    std::vector<size_t> node_to_potential(num_vertices(junction_tree_), -1);
+    std::vector<size_t> jctnode_to_potential(num_vertices(junction_tree_), -1);
     for(size_t i = 0; i < potentials_.size(); ++i) {
         neighbors_t label;
         for(auto &&a : potentials_[i].parents) {
             label.insert(a.first);
         }
         label.insert(potentials_[i].child);
-        junction_tree::vertex_t v = map_labels_to_nodes[label];
+        junction_tree::vertex_t v = map_labels_to_jctnodes[label];
         // check for duplicated potentials
-        assert(node_to_potential[v] != -1);
-        node_to_potential[v] = i;
+        assert(jctnode_to_potential[v] == -1);
+        jctnode_to_potential[v] = i;
     }
     // For nodes missing potentials add some unit ones.
-    for(junction_tree::vertex_t v = 0; v < node_to_potential.size(); ++v) {
-        if(node_to_potential[v] != -1) {
+    for(junction_tree::vertex_t v = 0; v < jctnode_to_potential.size(); ++v) {
+        if(jctnode_to_potential[v] != -1) {
             continue;
         }
         potential_t unit;
         unit.type = Potential::Unit;
-        auto label = node_labels[v];
+        auto label = jctnode_labels[v];
         for(auto &&a : label) {
             unit.parents.emplace_back(a, 0.0f);
         }
         potentials_.push_back(unit);
-        node_to_potential[v] = potentials_.size()-1;
+        jctnode_to_potential[v] = potentials_.size()-1;
     }
 
-    // sort the labels of each node according to elimination rank
+    // sort the labels of each jctnode according to elimination rank
     elimination_rank_.resize(num_vertices(graph_));
     for(size_t n = 0; n < elim_steps.first.size(); ++n) {
         elimination_rank_[elim_steps.first[n]] = n;
     }
     using tensor_label_t = std::vector<PeelingVertex::label_t>;
     std::vector<tensor_label_t> tensor_labels(num_vertices(junction_tree_));
-    auto node_range = boost::make_iterator_range(vertices(junction_tree_));
-    for(auto &&v : node_range) {
-        const neighbors_t &label = node_labels[v];
+    auto jctnode_range = boost::make_iterator_range(vertices(junction_tree_));
+    for(auto &&v : jctnode_range) {
+        // sort the vertices at this jctnode by elimination rank
+        const neighbors_t &label = jctnode_labels[v];
         tensor_label_t tensor_lab(label.begin(), label.end());
         boost::range::sort(tensor_lab, [&](auto a, auto b) {
             return elimination_rank_[a] < elimination_rank_[b];
         });
         tensor_labels[v] = tensor_lab;
+
+        // identify the proper shuffle axes.
+        auto &pot = potentials_[jctnode_to_potential[v]];
+        if(pot.type == Potential::Unit) {
+            // skip if unit potential
+            continue;
+        }
+        pot.shuffle.resize(tensor_labels.size());
+        auto it = boost::range::find(tensor_lab, pot.child);
+        assert(it != tensor_lab.end());
+        pot.shuffle[std::distance(tensor_lab.begin(), it)] = 0;
+        for(int i = 0; i < pot.parents.size(); ++i) {
+            it = boost::range::find(tensor_lab, pot.parents[i].first);
+            assert(it != tensor_lab.end());
+            pot.shuffle[std::distance(tensor_lab.begin(), it)] = i+1;
+        }
     }
 
     // ploidy information
@@ -264,8 +281,8 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     std::vector<size_t> output_index(num_vertices(junction_tree_), -1);
 
     // iterate the junction tree in reverse order
-    auto rev_node_range = boost::adaptors::reverse(node_range);
-    for(auto &&v : rev_node_range) {
+    auto rev_jctnode_range = boost::adaptors::reverse(jctnode_range);
+    for(auto &&v : rev_jctnode_range) {
         peeling_t peeler;
 
         std::vector<int> tensor_ploidies(tensor_labels[v].size());
@@ -295,7 +312,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
             // should not get here
             assert(false);
         }
-        peeler->AddLocal(tensor_labels[v], node_to_potential[v]);
+        peeler->AddLocal(tensor_labels[v], jctnode_to_potential[v]);
 
         auto adj_range = boost::make_iterator_range(adjacent_vertices(v, junction_tree_));
         for(auto &&w : adj_range) {
@@ -1113,15 +1130,15 @@ triangulate_graph(const pedigree_graph::Graph &graph) {
         }
     }
     // DEBUG: print elimination information
-    for(auto &&v : elim_order) {
-        std::cerr << "Eliminate vertex " << get(boost::vertex_label, graph, v)
-            << " clique is { ";
-        std::cerr << get(boost::vertex_label, graph, v);
-        for(auto &&a : neighbors[v]) {
-             std::cerr << ", " << get(boost::vertex_label, graph, a);
-        }
-        std::cerr << " }\n";
-    }
+    // for(auto &&v : elim_order) {
+    //     std::cerr << "Eliminate vertex " << get(boost::vertex_label, graph, v)
+    //         << " clique is { ";
+    //     std::cerr << get(boost::vertex_label, graph, v);
+    //     for(auto &&a : neighbors[v]) {
+    //          std::cerr << ", " << get(boost::vertex_label, graph, a);
+    //     }
+    //     std::cerr << " }\n";
+    // }
 
     return {elim_order,neighbors};
 }

@@ -32,6 +32,7 @@ SOFTWARE.
 #include <vector>
 
 namespace mutk {
+namespace vcf {
 
 // The *_free_t classes are used enable RAII on pointers created by htslib.
 namespace detail {
@@ -51,9 +52,9 @@ struct bcf_free_t {
 };
 }  // namespace detail
 
-class BcfReader {
+class Reader {
    public:
-    explicit BcfReader(const std::filesystem::path &path) {
+    explicit Reader(const std::filesystem::path &path) {
         input_.reset(hts_open(path.string().c_str(), "r"));
         if(!input_) {
             throw std::runtime_error("unable to open input file: '" + path.string() + "'.");
@@ -97,14 +98,14 @@ class BcfReader {
 };
 
 template <typename callback_t>
-void BcfReader::operator()(callback_t callback) {
+void Reader::operator()(callback_t callback) {
     std::unique_ptr<bcf1_t, detail::bcf_free_t> record{bcf_init()};
     if(!record) {
         throw std::invalid_argument("unable to allocate vcf record.");
     }
     // process all sites
     while(bcf_read(input_.get(), header_.get(), record.get()) == 0) {
-        callback(record.get(), header());
+        callback(header(), record.get());
     }
 }
 
@@ -158,10 +159,32 @@ inline int get_format_float(const bcf_hdr_t *header, bcf1_t *record, const char 
     return detail::realloc_check(n, p, buffer);
 }
 
+inline int get_format_int32(const bcf_hdr_t *header, bcf1_t *record, const char *tag, buffer_t<int32_t> *buffer) {
+    int32_t *p = buffer->data.get();
+    int n = bcf_get_format_int32(header, record, tag, &p, &buffer->capacity);  // NOLINT
+    return detail::realloc_check(n, p, buffer);
+}
+
 inline int get_genotypes(const bcf_hdr_t *header, bcf1_t *record, buffer_t<int32_t> *buffer) {
     int32_t *p = buffer->data.get();
     int n = bcf_get_genotypes(header, record, &p, &buffer->capacity);  // NOLINT
     return detail::realloc_check(n, p, buffer);
+}
+
+inline bool is_missing(int32_t x) {
+    return (x == bcf_int32_missing);
+}
+
+inline bool is_missing(float x) {
+    return bcf_float_is_missing(x);
+}
+
+inline bool is_vector_end(int32_t x) {
+    return (x == bcf_int32_vector_end);
+}
+
+inline bool is_vector_end(float x) {
+    return bcf_float_is_vector_end(x);
 }
 
 // an allele is missing if its value is '.', 'N', or 'n'.
@@ -187,6 +210,7 @@ inline bool is_ref_missing(bcf1_t *record) {
     return is_allele_missing(record->d.allele[0]);
 }
 
+} // namespace bcf
 } // namespace mutk
 
 #endif  // MUTK_VCF_HPP

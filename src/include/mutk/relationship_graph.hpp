@@ -59,7 +59,7 @@ extern const std::map<std::string, InheritanceModel> CHR_MODEL_MAP;
 
 struct workspace_t {
     std::vector<mutk::Tensor<1>> stack;
-    std::array<std::size_t,3> widths;
+    std::array<mutk::tensor_index_t,3> widths;
     float scale;
 };
 
@@ -91,6 +91,10 @@ public:
     samples_t SampleNames() const;
 
     workspace_t CreateWorkspace() const;
+
+    const std::vector<potential_t>& potentials() const {
+        return potentials_;
+    }
 
 protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
@@ -246,9 +250,15 @@ void GeneralPeelingVertex<N>::AddInput(const std::vector<PeelingVertex::label_t>
 template<std::size_t N>
 void GeneralPeelingVertex<N>::Forward(PeelingVertex::workspace_t *work) const {
     // copy local data to local buffer
-    work->stack[buffer_.index] = work->stack[local_data_.index];
-
     auto dims = detail::calc_dims(*work, local_data_.data_ploidy);
+    if(work->stack[local_data_.index].size() == 0) {
+        // unit potentials are empty
+        work->stack[buffer_.index].resize(dims.TotalSize());
+        work->stack[buffer_.index].setConstant(1.0f);
+    } else {
+        work->stack[buffer_.index] = work->stack[local_data_.index];
+    }
+
     for(int i=0;i<input_data_.size(); ++i) {
         auto input_dims = detail::calc_dims(*work, input_data_[i].data_ploidy);
         auto broadcast_dims = detail::calc_dims(*work, input_data_[i].broadcast_ploidy);

@@ -35,29 +35,13 @@ constexpr int ALLELE[][2] = {
 };
 }
 
-inline
-constexpr int num_genotypes(int n) {
-    return n*(n+1)/2;
-}
-
-template<int N>
-constexpr int dim_width(int n) {
-    static_assert(N == 1 || N == 2);
-    if constexpr(N == 1) {
-        return n;
-    } else {
-        return num_genotypes(n);
-    }
-}
-
-
 using KAllelesModel = mutk::mutation::KAllelesModel;
 using potential_t = mutk::RelationshipGraph::potential_t;
 
 // ret(i,j) = P(i|j)
 KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, any_t) const {
     assert(n > 0);
-    assert(n < 5);
+    assert(n <= 5);
 
     double beta = t*k_/(k_-1.0);
     double p_ji = -1.0/k_*expm1(-beta);
@@ -117,21 +101,23 @@ KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, mean_t) cons
     return ret;
 }
 
-KAllelesModel::tensor_t KAllelesModel::CreatePrior(int n, int ploidy) const {
-    assert(ploidy == 1 || ploidy == 2);
+KAllelesModel::tensor_t KAllelesModel::CreatePriorHaploid(int n) const {
     double k = k_;
     double e = theta_/(k-1.0);
 
-    if(ploidy == 1) {
-        double p_R = (1.0+e+(k-1.0)*e*hap_bias_)/(1.0+k*e);
-        double p_A = (e-e*hap_bias_)/(1.0+k*e);
+    double p_R = (1.0+e+(k-1.0)*e*hap_bias_)/(1.0+k*e);
+    double p_A = (e-e*hap_bias_)/(1.0+k*e);
 
-        tensor_t ret(dim_width<1>(n));
-        return ret.generate([&](const auto &coords) {
-            Eigen::DenseIndex i = coords[0];
-            return (i == 0) ? p_R : p_A;
-        });
-    }
+    tensor_t ret(mutk::dim_width<1>(n));
+    return ret.generate([&](const auto &coords) {
+        Eigen::DenseIndex i = coords[0];
+        return (i == 0) ? p_R : p_A;
+    });
+}
+
+KAllelesModel::tensor_t KAllelesModel::CreatePriorDiploid(int n) const {
+    double k = k_;
+    double e = theta_/(k-1.0);
 
     double p_hom = (1.0+e)/(1.0+k*e);
     double p_hetk = e/(1.0+k*e);
@@ -142,7 +128,7 @@ KAllelesModel::tensor_t KAllelesModel::CreatePrior(int n, int ploidy) const {
     double p_RA = p_hetk*(2.0+2.0*e+(k-2.0)*e*het_bias_)/(2.0+k*e);
     double p_AB = p_hetk*(2.0*e-2.0*e*het_bias_)/(2.0+k*e);
 
-    tensor_t ret(dim_width<2>(n));
+    tensor_t ret(mutk::dim_width<2>(n));
     return ret.generate([&](const auto &coords){
         Eigen::DenseIndex a = ALLELE[coords[0]][0];
         Eigen::DenseIndex b = ALLELE[coords[0]][1];
@@ -152,7 +138,6 @@ KAllelesModel::tensor_t KAllelesModel::CreatePrior(int n, int ploidy) const {
         return (a == 0) ? p_RA : p_AB;
     });
 }
-
 
 template<typename Arg>
 mutk::Tensor<2> create_transition_clone_haploid_impl(const mutk::mutation::Model &model,
@@ -167,7 +152,7 @@ mutk::Tensor<2> create_transition_gamete_diploid_impl(const mutk::mutation::Mode
 
     auto mat = create_transition_clone_haploid_impl(model, n, t, arg);
 
-    mutk::Tensor<2> ret(dim_width<1>(n), dim_width<2>(n));
+    mutk::Tensor<2> ret(mutk::dim_width<1>(n), mutk::dim_width<2>(n));
 
     // x/y -> a
     return ret.generate([&](const auto& coords) {
@@ -212,7 +197,7 @@ struct transition_traits<clone_diploid_tag> {
     using array_t = Eigen::array<Eigen::DenseIndex, TENSOR_SIZE>;
 
     static array_t Dims(int n) {
-        return {dim_width<2>(n), dim_width<2>(n)};
+        return {mutk::dim_width<2>(n), mutk::dim_width<2>(n)};
     }
     static Eigen::DenseIndex G1(const array_t &coords) {
         return ALLELE[coords[1]][0];
@@ -232,7 +217,7 @@ struct transition_traits<child_diploid_tag<N, M>> {
     using array_t = Eigen::array<Eigen::DenseIndex, TENSOR_SIZE>;
 
     static array_t Dims(int n) {
-        return {dim_width<2>(n), dim_width<N>(n), dim_width<M>(n)};
+        return {mutk::dim_width<2>(n), mutk::dim_width<N>(n), mutk::dim_width<M>(n)};
     }
     static Eigen::DenseIndex G1(const array_t &coords) {
         return coords[1];
@@ -252,7 +237,7 @@ struct transition_traits<child_selfing_tag<N>> {
     using array_t = Eigen::array<Eigen::DenseIndex, TENSOR_SIZE>;
 
     static array_t Dims(int n) {
-        return {dim_width<2>(n), dim_width<N>(n)};
+        return {mutk::dim_width<2>(n), mutk::dim_width<N>(n)};
     }
     static Eigen::DenseIndex G1(const array_t &coords) {
         return coords[1];
@@ -304,7 +289,7 @@ auto create_transition_diploid_impl(const mutk::mutation::Model &model,
         return gen(model, n, t1, t2, arg, mutk::mutation::ANY)
                 + gen(model, n, t1, t2, mutk::mutation::ANY, arg);
     } else if constexpr(std::is_integral_v<Arg>) {
-        mutk::Tensor<2> ret = gen(model, n, t1, t2, 0, arg);
+        auto ret = gen(model, n, t1, t2, 0, arg);
         for(Arg a=1; a < arg; ++a) {
             ret += gen(model, n, t1, t2, a, arg-a);
         }
@@ -331,70 +316,83 @@ inline
 mutk::Tensor<3> create_transition_child(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() >= 2);
-
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
     return create_transition_diploid_impl<child_diploid_tag<N,M>>(model, n, potential.parents[0].second,
-        potential.parents[1].second, arg);
+        potential.parents[1].second, arg).shuffle(shuffle_axes);
 }
 
 template<int N, typename Arg>
 inline
 mutk::Tensor<2> create_transition_child_selfing(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-
     assert(potential.parents.size() >= 1);
-
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
     return create_transition_diploid_impl<child_selfing_tag<N>>(model, n, potential.parents[0].second,
-        potential.parents[0].second, arg);
+        potential.parents[0].second, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<2> create_transition_clone_haploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() >= 1);
-    return create_transition_haploid<1>(model, n, potential.parents[0].second, arg);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
+    return create_transition_haploid<1>(model, n, potential.parents[0].second, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<2> create_transition_gamete_diploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() >= 1);
-    return create_transition_haploid<2>(model, n, potential.parents[0].second, arg);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
+    return create_transition_haploid<2>(model, n, potential.parents[0].second, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<3> create_transition_child_diploid_diploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-    return create_transition_child<2, 2>(model, n, potential, arg);
+    assert(potential.parents.size() >= 2);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    return create_transition_child<2, 2>(model, n, potential, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<3> create_transition_child_haploid_diploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-    return create_transition_child<1, 2>(model, n, potential, arg);
+    assert(potential.parents.size() >= 2);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    return create_transition_child<1, 2>(model, n, potential, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<3> create_transition_child_diploid_haploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-    return create_transition_child<2, 1>(model, n, potential, arg);
+    assert(potential.parents.size() >= 2);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    return create_transition_child<2, 1>(model, n, potential, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<3> create_transition_child_haploid_haploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-    return create_transition_child<1, 1>(model, n, potential, arg);
+    assert(potential.parents.size() >= 2);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    return create_transition_child<1, 1>(model, n, potential, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<2> create_transition_child_selfing_diploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-    return create_transition_child_selfing<2>(model, n, potential, arg);
+    assert(potential.parents.size() >= 1);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);    
+    return create_transition_child_selfing<2>(model, n, potential, arg).shuffle(shuffle_axes);
 }
 
 template<typename Arg>
 mutk::Tensor<2> create_transition_child_selfing_haploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
-    return create_transition_child_selfing<1>(model, n, potential, arg);
+    assert(potential.parents.size() >= 1);
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
+    return create_transition_child_selfing<1>(model, n, potential, arg).shuffle(shuffle_axes);
 }
 
 namespace mutk {
@@ -404,7 +402,7 @@ mutk::Tensor<1> create_mutation_potential(const mutk::mutation::Model &model,
     int n, const potential_t &potential, Arg arg) {
     using P = mutk::detail::Potential;
 
-    int g = num_genotypes(n);
+    int g = dim_width<2>(n);
 
     switch(potential.type) {
     case P::CloneDiploid:
@@ -434,6 +432,8 @@ mutk::Tensor<1> create_mutation_potential(const mutk::mutation::Model &model,
     case P::ChildSelfingHaploid:
         return create_transition_child_selfing_haploid(model, n, potential, arg)
             .reshape(tensor_dims(g*n));
+    case P::Unit:
+        return {};
     default:
         break;
     };

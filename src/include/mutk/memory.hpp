@@ -37,6 +37,23 @@
 
 namespace mutk {
 
+using tensor_index_t = Eigen::DenseIndex;
+
+inline
+constexpr tensor_index_t num_diploids(tensor_index_t n) {
+    return n*(n+1)/2;
+}
+
+template<int N>
+constexpr tensor_index_t dim_width(tensor_index_t n) {
+    static_assert(N == 1 || N == 2);
+    if constexpr(N == 1) {
+        return n;
+    } else {
+        return num_diploids(n);
+    }
+}
+
 template<std::size_t N>
 using Tensor = Eigen::Tensor<float,N>;
 
@@ -46,20 +63,14 @@ tensor_dims(Arg1 arg1, Args... args) {
     return {arg1,args...};
 }
 
-template<typename Arg1, typename ...Args>
-auto wrap_tensor(float *p, Arg1 arg1, Args... args) {
-    return Eigen::TensorMap<Eigen::Tensor<float,1+sizeof...(Args)>>(p,
-        arg1, args...);
+template<typename T, typename ...Args>
+auto wrap_tensor(T *p, Args... args) {
+    return Eigen::TensorMap<Eigen::Tensor<T,sizeof...(Args)>>(p, args...);
 }
 
-template<typename Arg, std::enable_if_t<std::is_integral<Arg>::value, int> = 0>
-auto wrap_tensor(float *p, Arg arg) {
-    return Eigen::TensorMap<Eigen::Tensor<float,1>>(p, arg);
-}
-
-template<typename Arg, std::enable_if_t<std::is_class<Arg>::value, int> = 0>
-auto wrap_tensor(float *p, Arg arg) {
-    return Eigen::TensorMap<Eigen::Tensor<float,arg.size()>>(p, arg);
+template<typename T, std::size_t N>
+auto wrap_tensor(T *p, Eigen::array<Eigen::DenseIndex,N> arg) {
+    return Eigen::TensorMap<Eigen::Tensor<T,N>>(p, arg);
 }
 
 template<typename A, typename B>

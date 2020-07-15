@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 
     CLI11_PARSE(app, argc, argv);
 
-    mutk::BcfReader reader{args.input};
+    mutk::vcf::Reader reader{args.input};
 
     auto samples = reader.samples();
 

@@ -28,6 +28,7 @@
 #include <mutk/memory.hpp>
 
 #include <boost/container/static_vector.hpp>
+#include <vector>
 
 namespace mutk {
 
@@ -54,6 +55,7 @@ struct potential_t {
     int child;
     using data_t = std::pair<int,float>;
     boost::container::static_vector<data_t, 2> parents;
+    std::vector<int> shuffle;
 
     potential_t() = default;
     potential_t(Potential type_arg, int child_arg) : type{type_arg}, child{child_arg} {}
@@ -83,7 +85,8 @@ public:
     virtual matrix_t CreateMatrix(int n, float t, mean_t) const = 0;
     virtual matrix_t CreateMatrix(int n, float t, int x) const = 0;
 
-    virtual tensor_t CreatePrior(int n, int ploidy) const = 0;
+    virtual tensor_t CreatePriorDiploid(int n) const = 0;
+    virtual tensor_t CreatePriorHaploid(int n) const = 0;
 
     mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, any_t);
     mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, mean_t);
@@ -122,7 +125,8 @@ public:
     virtual matrix_t CreateMatrix(int n, float t, mean_t) const override;
     virtual matrix_t CreateMatrix(int n, float t, int x) const override;
 
-    virtual tensor_t CreatePrior(int n, int ploidy) const override;
+    virtual tensor_t CreatePriorDiploid(int n) const override;
+    virtual tensor_t CreatePriorHaploid(int n) const override;
 
 protected:
     double k_;
