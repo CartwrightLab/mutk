@@ -21,9 +21,55 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 */
+#include <doctest/doctest.h>
 
 #include <mutk/mutation.hpp>
 #include <mutk/relationship_graph.hpp>
+
+// Libraries needed for testing
+#include <boost/numeric/ublas/matrix.hpp>
+
+namespace {
+// Structure useful for unit testing
+struct kalleles_test_mat {
+    using mat_t = boost::numeric::ublas::matrix<float,
+        boost::numeric::ublas::column_major,std::vector<float>>;
+
+    mat_t Q;
+
+    kalleles_test_mat(int n, float k) : Q(n+1,n+1) {
+        using namespace boost::numeric::ublas;
+        // Build matrix
+        vector<float> freqs(n+1, 1.0/k);
+        freqs[n] = 1.0-n/k;
+
+        for(int i=0; i<=n; ++i) {
+            for(int j=0; j<=n; ++j) {
+                Q(i,j) = freqs[j];
+            }
+            Q(i,i) = Q(i,i)-1.0;
+        }
+
+        // Scale matrix into substitution time
+        Q *= k/(k-1);
+    }
+};
+
+template<typename F>
+void run_mutation_tests(F test) {
+    test(4, 0.0,  4.0);
+
+    test(1, 1e-8, 4.0);
+    test(2, 1e-8, 4.0);
+    test(3, 1e-8, 4.0);
+    test(4, 1e-8, 4.0);
+    
+    test(4, 1e-8, 4.0);
+    test(4, 1e-9, 5.0);
+    test(4, 1e-6, 6.0);
+    test(4, 1e-3, 7.0);
+}
+} // anon namespace
 
 namespace {
 constexpr int ALLELE[][2] = {
@@ -56,10 +102,51 @@ KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, any_t) const
     });
 }
 
+TEST_CASE("[libmutk] mutation::KAllelesModel::CreateMatrix with any_t") {
+    using namespace boost::numeric::ublas;
+    
+    auto test = [&](int n, float u, float k) {
+        CAPTURE(n);
+        CAPTURE(k);
+        CAPTURE(u);
+
+        KAllelesModel model(k, 0.001, 0, 0, 0);
+
+        using mat_t = kalleles_test_mat::mat_t;
+
+        kalleles_test_mat mat(n,k);
+
+        mat_t P = identity_matrix<float>(n+1);
+        mat_t m = P;
+        float t = 1.0;
+        float f = 1.0;
+        // Use the first 11 elements of the expm series 
+        for(int g=1;g <= 11; ++g) {
+            mat_t a = prec_prod(m,mat.Q);
+            m = a;
+            t *= u;
+            f *= g;
+            P += m * (t/f);
+        }
+        auto obs = model.CreateMatrix(n, u, mutk::mutation::ANY);
+        REQUIRE(obs.dimensions().size() == 2);
+        REQUIRE(obs.dimension(0) == n);
+        REQUIRE(obs.dimension(1) == n);
+        for(int i=0; i < n; ++i) {
+            for(int j=0; j < n; ++j) {
+                CAPTURE(i);
+                CAPTURE(j);
+                CHECK(obs(i,j) == doctest::Approx(P(i,j)));
+            }
+        }
+    };
+    run_mutation_tests(test);
+}
+
 // ret(i,j) = P(i & x mutations | j)
-KAllelesModel::matrix_t KAllelesModel:: CreateMatrix(int n, float t, int x) const {
+KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, int x) const {
     assert(n > 0);
-    assert(n < 5);
+    assert(n <= 5);
     assert(x >= 0);
     
     double p_x;
@@ -81,10 +168,61 @@ KAllelesModel::matrix_t KAllelesModel:: CreateMatrix(int n, float t, int x) cons
     });
 }
 
+TEST_CASE("[libmutk] mutation::KAllelesModel::CreateMatrix with int") {
+    using namespace boost::numeric::ublas;
+    
+    auto test = [&](int n, float u, float k) {
+        CAPTURE(n);
+        CAPTURE(k);
+        CAPTURE(u);
+
+        KAllelesModel model(k, 0.001, 0, 0, 0);
+
+        using mat_t = kalleles_test_mat::mat_t;
+
+        kalleles_test_mat mat(n,k);
+
+        mat_t P = identity_matrix<float>(n+1);
+        mat_t m = P;
+        mat_t J = mat.Q+m;
+        float t;
+        float f;
+        for(int x=0; x <= 10; ++x) {
+            CAPTURE(x);
+            if(x == 0) {
+                P = m*exp(-u);
+                f = 1.0;
+                t = 1.0;
+            } else {
+                mat_t a = prec_prod(m,J);
+                m = a;
+                t *= u;
+                f *= x;
+                P = m*(exp(-u)*t/f);
+            }
+            auto obs = model.CreateMatrix(n, u, x);
+            REQUIRE(obs.dimensions().size() == 2);
+            REQUIRE(obs.dimension(0) == n);
+            REQUIRE(obs.dimension(1) == n);
+            for(int i=0; i < n; ++i) {
+                for(int j=0; j < n; ++j) {
+                    CAPTURE(i);
+                    CAPTURE(j);
+                    CHECK(obs(i,j) == doctest::Approx(P(i,j)));
+                }
+            }
+
+        }
+    };
+
+    run_mutation_tests(test);
+}
+
+
 // ret(i,j) = E[num of mutations | i,j]*P(i|j)
 KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, mean_t) const {
     assert(n > 0);
-    assert(n < 5);
+    assert(n <= 5);
 
     Tensor<2> ret(n,n);
 
@@ -101,6 +239,57 @@ KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, mean_t) cons
     return ret;
 }
 
+TEST_CASE("[libmutk] mutation::KAllelesModel::CreateMatrix with mean_t") {
+    using namespace boost::numeric::ublas;
+    
+    auto test = [&](int n, float u, float k) {
+        CAPTURE(n);
+        CAPTURE(k);
+        CAPTURE(u);
+
+        KAllelesModel model(k, 0.001, 0, 0, 0);
+
+        using mat_t = kalleles_test_mat::mat_t;
+
+        kalleles_test_mat mat(n,k);
+
+        mat_t P = identity_matrix<float>(n+1);
+        mat_t m = P;
+        mat_t J = mat.Q+m;
+        mat_t S;
+        float t;
+        float f;
+        for(int x=0; x <= 10; ++x) {
+            if(x == 0) {
+                P = m*exp(-u);
+                S = P*x;
+                f = 1.0;
+                t = 1.0;
+            } else {
+                mat_t a = prec_prod(m,J);
+                m = a;
+                t *= u;
+                f *= x;
+                P = m*(exp(-u)*t/f);
+                S += P*x;
+            }
+        }
+        auto obs = model.CreateMatrix(n, u, mutk::mutation::MEAN);
+        REQUIRE(obs.dimensions().size() == 2);
+        REQUIRE(obs.dimension(0) == n);
+        REQUIRE(obs.dimension(1) == n);
+        for(int i=0; i < n; ++i) {
+            for(int j=0; j < n; ++j) {
+                CAPTURE(i);
+                CAPTURE(j);
+                CHECK(obs(i,j) == doctest::Approx(S(i,j)));
+            }
+        }
+    };
+
+    run_mutation_tests(test);
+}
+
 KAllelesModel::tensor_t KAllelesModel::CreatePriorHaploid(int n) const {
     double k = k_;
     double e = theta_/(k-1.0);
@@ -113,6 +302,52 @@ KAllelesModel::tensor_t KAllelesModel::CreatePriorHaploid(int n) const {
         Eigen::DenseIndex i = coords[0];
         return (i == 0) ? p_R : p_A;
     });
+}
+
+TEST_CASE("[libmutk] mutation::KAllelesModel::CreatePriorHaploid") {
+    auto test_haploid = [](int n, float theta, float hap_bias,
+        float k) {
+        CAPTURE(n);
+        CAPTURE(theta);
+        CAPTURE(hap_bias);
+        CAPTURE(k);
+
+        KAllelesModel model(k, theta, 0, 0, hap_bias);
+
+        auto obs = model.CreatePriorHaploid(n);
+
+        if(n == k) {
+            mutk::Tensor<0> s = obs.sum();
+            CHECK(s(0) == doctest::Approx(1.0f));
+        }
+
+        const int sz = n;
+        for(int a=0;a<sz;++a) {
+            CAPTURE(a);
+            float e = theta/(k-1.0);
+            float r;
+            if(a == 0) {
+                // reference haploid
+                r = (1.0+e+e*(k-1)*hap_bias)/(1.0+k*e);
+            } else {
+                r = (e-e*hap_bias)/(1.0+k*e);
+            }
+            float expected = r;
+            CHECK(obs(a) == doctest::Approx(expected));
+        }
+    };
+
+    auto test = [&](float theta, float hap_bias, float k) {
+        for(int i=1;i<=5;++i) {
+            test_haploid(i, theta, hap_bias, k);
+        }
+    };
+
+    test(0.001, 0.0, 5.0);
+    test(0.01, 1.0, 6.0);
+    test(0.1, 0.0, 4.0);
+    test(0.001, 1.0, 5.0);
+    test(0.001, -1.0, 5.5);
 }
 
 KAllelesModel::tensor_t KAllelesModel::CreatePriorDiploid(int n) const {
@@ -137,6 +372,66 @@ KAllelesModel::tensor_t KAllelesModel::CreatePriorDiploid(int n) const {
         }
         return (a == 0) ? p_RA : p_AB;
     });
+}
+
+TEST_CASE("[libmutk] mutation::KAllelesModel::CreatePriorDiploid") {
+    auto test_diploid = [](int n, float theta, float hom_bias,
+        float het_bias, float k) {
+        CAPTURE(n);
+        CAPTURE(theta);
+        CAPTURE(hom_bias);
+        CAPTURE(het_bias);
+        CAPTURE(k);
+
+        KAllelesModel model(k, theta, hom_bias, het_bias, 0);
+
+        auto obs = model.CreatePriorDiploid(n);
+
+        if(n == k) {
+            mutk::Tensor<0> s = obs.sum();
+            CHECK(s(0) == doctest::Approx(1.0f));
+        }
+
+        const int sz = n;
+        int y = 0;
+        for(int a=0;a<sz;++a) {
+            for(int b=0;b<=a;++b) {
+                CAPTURE(a);
+                CAPTURE(b);
+                float e = theta/(k-1.0);
+
+                double r = 0.0;
+                if(a == 0 && b == 0) {
+                    // Reference Homozygote
+                    r = (1.0+e)/(1.0+k*e)*(2.0+e+(k-1.0)*e*hom_bias)/(2.0+k*e);
+                } else if(a == b) {
+                    r = (1.0+e)/(1.0+k*e)*(e-e*hom_bias)/(2.0+k*e);
+                } else if(b == 0 || a == 0) {
+                    // Reference Heterozygote
+                    r = e/(1.0+k*e)*(2.0+2.0*e+(k-2.0)*e*het_bias)/(2.0+k*e);
+                } else {
+                    // Alt heterozygote
+                    r = e/(1.0+k*e)*(2.0*e-2.0*e*het_bias)/(2.0+k*e);
+                }
+                float expected = r;
+                CHECK(obs(y) == doctest::Approx(expected));
+                ++y;
+            }
+        }
+
+    };
+
+    auto test = [&](float theta, float hom_bias, float het_bias, float k) {
+        for(int i=1;i<=5;++i) {
+            test_diploid(i, theta, hom_bias, het_bias, k);
+        }
+    };
+
+    test(0.001, 0.0, 0.0, 5.0);
+    test(0.01, 1.0, 0.0, 6.0);
+    test(0.1, 0.0, 1.0, 4.0);
+    test(0.001, 1.0, 1.0, 5.0);
+    test(0.001, -1.0, -1.0, 5.5);
 }
 
 template<typename Arg>
@@ -306,9 +601,9 @@ template<typename Arg>
 mutk::Tensor<2> create_transition_clone_diploid(const mutk::mutation::Model &model, 
     int n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() >= 1);
- 
+    auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
     return create_transition_diploid_impl<clone_diploid_tag>(model, n, potential.parents[0].second,
-        potential.parents[0].second, arg);
+        potential.parents[0].second, arg).shuffle(shuffle_axes);
 }
 
 template<int N, int M, typename Arg>

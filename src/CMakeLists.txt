@@ -57,9 +57,7 @@ install(TARGETS mutk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 #####################################################################
 # mutk subcommands
 
-set(mutk_subcommands version genseed modelfit
-  graph
-  )
+set(mutk_subcommands version genseed modelfit graph)
 
 foreach(cmd ${mutk_subcommands})
   add_executable(mutk-${cmd} mutk-${cmd}.cpp)

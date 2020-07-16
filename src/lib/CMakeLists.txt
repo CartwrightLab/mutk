@@ -34,6 +34,7 @@ set(mutk_headers mutk.hpp pedigree.hpp utility.hpp relationship_graph.hpp
 
 find_package(Eigen3)
 find_package(HTSlib)
+find_package(Boost)
 
 #####################################################################
 # libmutk library
