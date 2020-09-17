@@ -24,6 +24,7 @@ set(gcovr_html "coverage.html")
 set(gcovr_xml  "cobertura.xml")
 set(gcovr_exclude
   "${CMAKE_SOURCE_DIR}/src/contrib"
+  "${CMAKE_SOURCE_DIR}/contrib"
 )
 
 find_package(Gcovr)
@@ -44,7 +45,8 @@ if(Gcovr_FOUND)
       --exclude-unreachable-branches
       ${gcovr_exclude_}
       --html-details
-      --output "${gcovr_html}"
+      --output "${CMAKE_CURRENT_BINARY_DIR}/${gcovr_html}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
   add_custom_target(coverage_html
     DEPENDS "${gcovr_html}"
@@ -58,7 +60,8 @@ if(Gcovr_FOUND)
       --exclude-unreachable-branches
       ${gcovr_exclude_}
       --xml
-      --output "${gcovr_xml}"
+      --output "${CMAKE_CURRENT_BINARY_DIR}/${gcovr_xml}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
 
   add_custom_target(coverage_xml
