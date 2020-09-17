@@ -92,6 +92,18 @@ constexpr int ALLELE[][2] = {
 using KAllelesModel = mutk::mutation::KAllelesModel;
 using potential_t = mutk::RelationshipGraph::potential_t;
 
+TEST_CASE("[libmutk] mutation::KAllelesModel::KAllelesModel") {
+    CHECK_NOTHROW(KAllelesModel(4.0, 0.001, 0.0, 0.0, 0.0));
+    CHECK_THROWS_AS(KAllelesModel(1.0, 0.001, 0.0, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, -0.1, 0.0, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 1.1, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, -3000, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, 1.1, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, -4000, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, 0.0, 1.1), std::invalid_argument);
+    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, 0.0, -3000), std::invalid_argument);
+}
+
 // ret(i,j) = P(i|j)
 KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, any_t) const {
     assert(n > 0);
@@ -589,11 +601,12 @@ auto create_transition_diploid_impl(const mutk::mutation::Model &model,
     if constexpr(std::is_same_v<Arg, mutk::mutation::any_t>) {
         return gen(model, n, t1, t2, arg, arg);
     } else if constexpr(std::is_same_v<Arg, mutk::mutation::mean_t>) {
-        return gen(model, n, t1, t2, arg, mutk::mutation::ANY)
-                + gen(model, n, t1, t2, mutk::mutation::ANY, arg);
+        auto ret = gen(model, n, t1, t2, arg, mutk::mutation::ANY);
+        ret += gen(model, n, t1, t2, mutk::mutation::ANY, arg);
+        return ret;
     } else if constexpr(std::is_integral_v<Arg>) {
         auto ret = gen(model, n, t1, t2, 0, arg);
-        for(Arg a=1; a < arg; ++a) {
+        for(Arg a=1; a <= arg; ++a) {
             ret += gen(model, n, t1, t2, a, arg-a);
         }
         return ret;
@@ -637,57 +650,170 @@ mutk::Tensor<2> create_transition_clone_diploid(const mutk::mutation::Model &mod
 }
 
 TEST_CASE("[libmutk] create_transition_clone_diploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
-        CAPTURE(n);
-        CAPTURE(k);
-        CAPTURE(u);
+    SUBCASE("Passing mutk::mutation::ANY as argument.") {
+        auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+            CAPTURE(n);
+            CAPTURE(k);
+            CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
-        pot.shuffle = shuf;
-        KAllelesModel model{k, 0.001, 0, 0, 0};
-        auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::ANY);
+            potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
+            pot.shuffle = shuf;
+            KAllelesModel model{k, 0.001, 0, 0, 0};
+            auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::ANY);
 
-        auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
+            auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
 
-        REQUIRE(obs.dimensions().size() == 2);
-        REQUIRE(obs.dimension(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.dimension(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
-        for(int a1=0,a=0;a1<n;++a1) {
-            for(int a2=0;a2<=a1;++a2,++a) {
-                for(int b1=0,b=0;b1<n;++b1) {
-                    for(int b2=0;b2<=b1;++b2,++b) {
-                        CAPTURE(a1);
-                        CAPTURE(a2);
-                        CAPTURE(a);
-                        CAPTURE(b1);
-                        CAPTURE(b2);
-                        CAPTURE(b);
-                        // b1/b2 -> a1/a2
-                        float expected = mat(a1,b1)*mat(a2,b2);
-                        if(a1 != a2) {
-                            expected += mat(a2,b1)*mat(a1,b2);
+            REQUIRE(obs.dimensions().size() == 2);
+            REQUIRE(obs.dimension(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
+            REQUIRE(obs.dimension(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+            for(int a1=0,a=0;a1<n;++a1) {
+                for(int a2=0;a2<=a1;++a2,++a) {
+                    for(int b1=0,b=0;b1<n;++b1) {
+                        for(int b2=0;b2<=b1;++b2,++b) {
+                            CAPTURE(a1);
+                            CAPTURE(a2);
+                            CAPTURE(a);
+                            CAPTURE(b1);
+                            CAPTURE(b2);
+                            CAPTURE(b);
+                            // b1/b2 -> a1/a2
+                            float expected = mat(a1,b1)*mat(a2,b2);
+                            if(a1 != a2) {
+                                expected += mat(a2,b1)*mat(a1,b2);
+                            }
+                            std::array<int, 2> indexes = {a,b};
+                            int o1 = indexes[pot.shuffle[0]];
+                            int o2 = indexes[pot.shuffle[1]];
+                            CHECK(obs(o1,o2) == doctest::Approx(expected));
                         }
-                        std::array<int, 2> indexes = {a,b};
-                        int o1 = indexes[pot.shuffle[0]];
-                        int o2 = indexes[pot.shuffle[1]];
-                        CHECK(obs(o1,o2) == doctest::Approx(expected));
                     }
                 }
             }
+        };
+        SUBCASE("Shuffle order is {0, 1}.") {
+            auto subtest = [&](int n, float u, float k) {
+                return test(n, u, k, {0,1});
+            };
+            run_mutation_tests(subtest);
         }
-    };
-    SUBCASE("Shuffle order is {0, 1}.") {
-        auto subtest = [&](int n, float u, float k) {
-            return test(n, u, k, {0,1});
-        };
-        run_mutation_tests(subtest);
+        SUBCASE("Shuffle order is {1, 0}.") {
+            auto subtest = [&](int n, float u, float k) {
+                return test(n, u, k, {1,0});
+            };
+            run_mutation_tests(subtest);
+        }
     }
-    SUBCASE("Shuffle order is {1, 0}.") {
-        auto subtest = [&](int n, float u, float k) {
-            return test(n, u, k, {1,0});
+    SUBCASE("Passing mutk::mutation::MEAN as argument.") {
+        auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+            CAPTURE(n);
+            CAPTURE(k);
+            CAPTURE(u);
+
+            potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
+            pot.shuffle = shuf;
+            KAllelesModel model{k, 0.001, 0, 0, 0};
+            auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::MEAN);
+
+            auto mat1 = model.CreateMatrix(n, u, mutk::mutation::MEAN);
+            auto mat2 = model.CreateMatrix(n, u, mutk::mutation::ANY);
+
+            REQUIRE(obs.dimensions().size() == 2);
+            REQUIRE(obs.dimension(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
+            REQUIRE(obs.dimension(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+            for(int a1=0,a=0;a1<n;++a1) {
+                for(int a2=0;a2<=a1;++a2,++a) {
+                    for(int b1=0,b=0;b1<n;++b1) {
+                        for(int b2=0;b2<=b1;++b2,++b) {
+                            CAPTURE(a1);
+                            CAPTURE(a2);
+                            CAPTURE(a);
+                            CAPTURE(b1);
+                            CAPTURE(b2);
+                            CAPTURE(b);
+                            // b1/b2 -> a1/a2
+                            float expected = mat1(a1,b1)*mat2(a2,b2) + mat2(a1,b1)*mat1(a2,b2);
+                            if(a1 != a2) {
+                                expected += mat1(a2,b1)*mat2(a1,b2) + mat2(a2,b1)*mat1(a1,b2);
+                            }
+                            std::array<int, 2> indexes = {a,b};
+                            int o1 = indexes[pot.shuffle[0]];
+                            int o2 = indexes[pot.shuffle[1]];
+                            CHECK(obs(o1,o2) == doctest::Approx(expected));
+                        }
+                    }
+                }
+            }
         };
-        run_mutation_tests(subtest);
+        SUBCASE("Shuffle order is {0, 1}.") {
+            auto subtest = [&](int n, float u, float k) {
+                return test(n, u, k, {0,1});
+            };
+            run_mutation_tests(subtest);
+        }
+        SUBCASE("Shuffle order is {1, 0}.") {
+            auto subtest = [&](int n, float u, float k) {
+                return test(n, u, k, {1,0});
+            };
+            run_mutation_tests(subtest);
+        }
     }
+    SUBCASE("Passing an integer as argument.") {
+        auto test = [&](int n, float u, float k, std::vector<int> shuf, int val) {
+            CAPTURE(n);
+            CAPTURE(k);
+            CAPTURE(u);
+
+            potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
+            pot.shuffle = shuf;
+            KAllelesModel model{k, 0.001, 0, 0, 0};
+            auto obs = create_transition_clone_diploid(model, n, pot, val);
+
+            REQUIRE(obs.dimensions().size() == 2);
+            REQUIRE(obs.dimension(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
+            REQUIRE(obs.dimension(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+            for(int a1=0,a=0;a1<n;++a1) {
+                for(int a2=0;a2<=a1;++a2,++a) {
+                    for(int b1=0,b=0;b1<n;++b1) {
+                        for(int b2=0;b2<=b1;++b2,++b) {
+                            CAPTURE(a1);
+                            CAPTURE(a2);
+                            CAPTURE(a);
+                            CAPTURE(b1);
+                            CAPTURE(b2);
+                            CAPTURE(b);
+                            // b1/b2 -> a1/a2
+                            float expected = 0.0;
+                            for(int i=0;i<=val;++i) {           
+                                auto mat1 = model.CreateMatrix(n, u, i);
+                                auto mat2 = model.CreateMatrix(n, u, val-i);
+                                expected += mat1(a1,b1)*mat2(a2,b2);
+                                if(a1 != a2) {
+                                    expected += mat1(a2,b1)*mat2(a1,b2);
+                                }
+                            }
+                            std::array<int, 2> indexes = {a,b};
+                            int o1 = indexes[pot.shuffle[0]];
+                            int o2 = indexes[pot.shuffle[1]];
+                            CHECK(obs(o1,o2) == doctest::Approx(expected));
+                        }
+                    }
+                }
+            }
+        };
+        SUBCASE("Shuffle order is {0, 1}. Integer is 0.") {
+            auto subtest = [&](int n, float u, float k) {
+                return test(n, u, k, {0,1}, 0);
+            };
+            run_mutation_tests(subtest);
+        }
+        SUBCASE("Shuffle order is {1, 0}. Integer is 1.") {
+            auto subtest = [&](int n, float u, float k) {
+                return test(n, u, k, {1,0}, 1);
+            };
+            run_mutation_tests(subtest);
+        }
+    }
+
 }
 
 template<typename Arg>
