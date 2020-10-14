@@ -66,7 +66,7 @@ enum EdgeType : int {
 };
 
 enum struct VertexType : int {
-    Founder, Germline, Somatic, Sample
+    Germline, Somatic, Sample
 };
 
 using Sex = mutk::Pedigree::Sex;

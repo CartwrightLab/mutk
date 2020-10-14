@@ -231,6 +231,34 @@ int main(int argc, char *argv[]) {
     // Store founders and mutation matrices by value of n.
     // reshape potentials by elimination order
 
+    {
+        auto p = model.CreatePriorDiploid(2);
+        mutk::Tensor<2> m1 = model.CreateMatrix(2, 1e-8f, mutk::mutation::ANY);
+        mutk::Tensor<2> m2 = model.CreateMatrix(2, 2e-8f, mutk::mutation::ANY);
+        mutk::detail::potential_t pot(Potential::ChildDiploidDiploid, 0, 1, 2e-8f, 2, 2e-8f);
+        pot.shuffle = {0,1,2};
+        mutk::Tensor<3> m3 = model.CreatePotential(2, pot, mutk::mutation::ANY).
+            reshape(mutk::tensor_dims(3,3,3));
+        double val = 0.0;
+        for(int d = 0; d < 3; ++d) {
+            for(int m = 0; m < 3; ++m) {
+                double d1 = 0.0;
+                for(int c = 0; c < 3; ++c) {
+                    d1 += m3(c,d,m);
+                }
+                double d2 = 0.0;
+                for(int c = 0; c < 3; ++c) {
+                    d2 += m1(c,d);
+                }
+                double d3 = 0.0;
+                for(int c = 0; c < 3; ++c) {
+                    d3 += m1(c,m);
+                }
+                val += d1*d2*d3*p(d)*p(m);
+            }
+        }
+        std::cout << val << " " << log(val) << std::endl;
+    }
 
     return EXIT_SUCCESS;
 }

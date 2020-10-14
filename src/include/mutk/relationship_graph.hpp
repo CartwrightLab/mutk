@@ -96,6 +96,10 @@ public:
         return potentials_;
     }
 
+    const graph_t & graph() const {
+        return graph_;
+    }
+
 protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 

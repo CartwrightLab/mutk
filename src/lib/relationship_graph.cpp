@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 */
+#include <doctest/doctest.h>
 
 #include <mutk/relationship_graph.hpp>
 #include <mutk/detail/graph.hpp>
@@ -165,6 +166,87 @@ void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
     samples_.second = num_vertices(graph_);
 }
 
+// LCOV_EXCL_START
+TEST_CASE("[libmutk] RelationshipGraph::ConstructGraph") {
+    SUBCASE("InheritanceModel::Autosomal") {
+        const char ped[] = 
+            "##PEDNG v0.1\n"
+            "A\t.\t.\tM\t=\n"
+            "B\t.\t.\tF\t=\n"
+            "C\tA\tB\tM\t=\n";
+
+        std::vector<const char*> known_samples = {"A","B","C"};
+
+        Pedigree pedigree;
+        REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
+
+        mutk::RelationshipGraph relationship_graph;
+        REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
+            known_samples, mutk::InheritanceModel::Autosomal,
+            1e-6, 1e-6, false));
+
+        auto graph = relationship_graph.graph();
+
+        auto vertex_range = boost::make_iterator_range(vertices(graph));
+
+        auto labels = get(boost::vertex_label, graph);
+        auto ploidies = get(boost::vertex_ploidy, graph);
+        auto types = get(boost::vertex_type, graph);
+
+        CHECK(labels[0] == "B/z");
+        CHECK(labels[1] == "A/z");
+        CHECK(labels[2] == "B");
+        CHECK(labels[3] == "C");
+        CHECK(labels[4] == "A");
+
+        CHECK(ploidies[0] == 2);
+        CHECK(ploidies[1] == 2);
+        CHECK(ploidies[2] == 2);
+        CHECK(ploidies[3] == 2);
+        CHECK(ploidies[4] == 2);
+
+        CHECK(types[0] == VertexType::Germline);
+        CHECK(types[1] == VertexType::Germline);
+        CHECK(types[2] == VertexType::Sample);
+        CHECK(types[3] == VertexType::Sample);
+        CHECK(types[4] == VertexType::Sample);
+
+        auto adj0 = boost::make_iterator_range(adjacent_vertices(0, graph));
+        auto inv0 = boost::make_iterator_range(inv_adjacent_vertices(0, graph));
+        REQUIRE(adj0.size() == 2);
+        REQUIRE(inv0.size() == 0);
+        CHECK(adj0[0] == 2);
+        CHECK(adj0[1] == 3);
+
+        auto adj1 = boost::make_iterator_range(adjacent_vertices(1, graph));
+        auto inv1 = boost::make_iterator_range(inv_adjacent_vertices(1, graph));
+        REQUIRE(adj1.size() == 2);
+        REQUIRE(inv1.size() == 0);
+        CHECK(adj1[0] == 4);
+        CHECK(adj1[1] == 3);
+
+        auto adj2 = boost::make_iterator_range(adjacent_vertices(2, graph));
+        auto inv2 = boost::make_iterator_range(inv_adjacent_vertices(2, graph));
+        REQUIRE(adj2.size() == 0);
+        REQUIRE(inv2.size() == 1);
+        CHECK(inv2[0] == 0);
+
+        auto adj3 = boost::make_iterator_range(adjacent_vertices(3, graph));
+        auto inv3 = boost::make_iterator_range(inv_adjacent_vertices(3, graph));
+        REQUIRE(adj3.size() == 0);
+        REQUIRE(inv3.size() == 2);
+        CHECK(inv3[0] == 1);
+        CHECK(inv3[1] == 0);
+
+        auto adj4 = boost::make_iterator_range(adjacent_vertices(4, graph));
+        auto inv4 = boost::make_iterator_range(inv_adjacent_vertices(4, graph));
+        REQUIRE(adj4.size() == 0);
+        REQUIRE(inv4.size() == 1);
+        CHECK(inv3[0] == 1);
+    }
+}
+// LCOV_EXCL_STOP
+
 void mutk::RelationshipGraph::ConstructPeeler() {
     potentials_ = create_potentials(graph_);
 
@@ -226,6 +308,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
             continue;
         }
         potential_t unit;
+        unit.child = -1;
         unit.type = Potential::Unit;
         auto label = jctnode_labels[v];
         for(auto &&a : label) {
@@ -258,7 +341,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
             // skip if unit potential
             continue;
         }
-        pot.shuffle.resize(tensor_labels.size());
+        pot.shuffle.resize(tensor_lab.size());
         auto it = boost::range::find(tensor_lab, pot.child);
         assert(it != tensor_lab.end());
         pot.shuffle[std::distance(tensor_lab.begin(), it)] = 0;
@@ -336,6 +419,81 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     }
     stack_size_ = counter;
 }
+
+// LCOV_EXCL_START
+TEST_CASE("[libmutk] RelationshipGraph::ConstructPeeler") {
+    using Potential = mutk::detail::Potential;
+    SUBCASE("InheritanceModel::Autosomal") {
+        const char ped[] = 
+            "##PEDNG v0.1\n"
+            "A\t.\t.\tM\t=\n"
+            "B\t.\t.\tF\t=\n"
+            "C\tA\tB\tM\t=\n";
+        std::vector<const char*> known_samples = {"A","B","C"};
+
+        Pedigree pedigree;
+        REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
+
+        mutk::RelationshipGraph relationship_graph;
+        REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
+            known_samples, mutk::InheritanceModel::Autosomal,
+            1e-6, 1e-6, false));
+        REQUIRE_NOTHROW(relationship_graph.ConstructPeeler());
+
+        auto &potentials = relationship_graph.potentials();
+
+        REQUIRE(potentials.size() == 3+2+3+1);
+
+        CHECK(potentials[0].type == Potential::LikelihoodDiploid);
+        CHECK(potentials[0].child == 2);
+        CHECK(potentials[0].parents.size() == 0);
+
+        CHECK(potentials[1].type == Potential::LikelihoodDiploid);
+        CHECK(potentials[1].child == 3);
+        CHECK(potentials[1].parents.size() == 0);
+
+        CHECK(potentials[2].type == Potential::LikelihoodDiploid);
+        CHECK(potentials[2].child == 4);
+        CHECK(potentials[2].parents.size() == 0);
+
+        CHECK(potentials[3].type == Potential::FounderDiploid);
+        CHECK(potentials[3].child == 0);
+        CHECK(potentials[3].parents.size() == 0);
+
+        CHECK(potentials[4].type == Potential::FounderDiploid);
+        CHECK(potentials[4].child == 1);
+        CHECK(potentials[4].parents.size() == 0);
+
+        CHECK(potentials[5].type == Potential::CloneDiploid);
+        CHECK(potentials[5].child == 2);
+        REQUIRE(potentials[5].parents.size() == 1);
+        CHECK(potentials[5].parents[0].first == 0);
+        CHECK(potentials[5].parents[0].second == 1e-6f);
+
+        CHECK(potentials[6].type == Potential::ChildDiploidDiploid);
+        CHECK(potentials[6].child == 3);
+        REQUIRE(potentials[6].parents.size() == 2);
+        CHECK(potentials[6].parents[0].first == 1);
+        CHECK(potentials[6].parents[0].second == 2e-6f);
+        CHECK(potentials[6].parents[1].first == 0);
+        CHECK(potentials[6].parents[1].second == 2e-6f);
+
+        CHECK(potentials[7].type == Potential::CloneDiploid);
+        CHECK(potentials[7].child == 4);
+        REQUIRE(potentials[7].parents.size() == 1);
+        CHECK(potentials[7].parents[0].first == 1);
+        CHECK(potentials[7].parents[0].second == 1e-6f);
+
+        CHECK(potentials[8].type == Potential::Unit);
+        CHECK(potentials[8].child == -1);
+        REQUIRE(potentials[8].parents.size() == 2);
+        CHECK(potentials[8].parents[0].first == 0);
+        CHECK(potentials[8].parents[0].second == 0.0f);
+        CHECK(potentials[8].parents[1].first == 1);
+        CHECK(potentials[8].parents[1].second == 0.0f);
+    }
+}
+// LCOV_EXCL_STOP
 
 mutk::RelationshipGraph::workspace_t
 mutk::RelationshipGraph::CreateWorkspace() const {
@@ -941,7 +1099,7 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
     auto olabels = get(boost::vertex_label, output);
     auto otypes = get(boost::vertex_type, output);
     for(auto &&v : boost::make_iterator_range(vertices(output))) {
-        if(otypes[v] == VertexType::Founder || otypes[v] == VertexType::Germline) {
+        if(otypes[v] == VertexType::Germline) {
             olabels[v] += "/z";
         } else if(otypes[v] == VertexType::Somatic) {
             olabels[v] += "/t";
@@ -1206,5 +1364,79 @@ junction_tree::Graph create_junction_tree(
     return ret;
 }
 
-} // namespace 
+} // anon namespace 
 
+
+// LCOV_EXCL_START
+TEST_CASE("[libmutk] GeneralPeelingVertex<N>::Forward") {
+    mutk::RelationshipGraph::workspace_t work;
+    work.scale = 0.0;
+    work.widths = {1, 2, 3};
+    work.stack.resize(10);
+
+    SUBCASE("N = 1") {
+        // Buffer
+        work.stack[0].resize(3);
+        work.stack[0].setConstant(-1.0);
+        // Local
+        work.stack[1].resize(3);
+        work.stack[1].setConstant(1.0);
+        // Input
+        work.stack[2].resize(3);
+        work.stack[2].setConstant(0.5);
+        // Output
+        work.stack[3].resize(0);
+
+        mutk::Tensor<1> expected = work.stack[1] * work.stack[2];
+
+        mutk::GeneralPeelingVertex<1> v({0}, 0, {2});
+        v.AddLocal({0}, 1);
+        v.AddInput({0}, 2);
+        v.AddOutput({0},3);
+        v.Forward(&work);
+
+        REQUIRE(work.stack[3].size() == 3);
+        for(int k=0; k < work.stack[3].size(); ++k) {
+            CAPTURE(k);
+            CHECK(work.stack[3][k] == expected[k]);            
+        }
+    }
+    SUBCASE("N = 2") {
+        // Buffer
+        work.stack[0].resize(3*3);
+        work.stack[0].setConstant(-1.0);
+        // Local
+        work.stack[1].resize(3*3);
+        work.stack[1].setValues({0.8,0.2,0.3,
+                                 0.1,0.6,0.3,
+                                 0.1,0.2,0.4});
+        // Input
+        work.stack[2].resize(3);
+        work.stack[2].setValues({0.0,0.1,0.9});
+        // Output
+        work.stack[3].resize(0);
+
+        // Expected output
+        mutk::Tensor<1> expected;
+        expected.resize(3);
+        for(int a=0;a<3;++a) {
+            expected(a) = 0.0;
+            for(int b=0;b<3;++b) {
+                expected(a) += work.stack[1](a*3+b)*work.stack[2](b);
+            }
+        }
+
+        mutk::GeneralPeelingVertex<2> v({0,1}, 0, {2,2});
+        v.AddLocal({0,1}, 1);
+        v.AddInput({0}, 2);
+        v.AddOutput({1},3);
+        v.Forward(&work);
+
+        REQUIRE(work.stack[3].size() == 3);
+        for(int k=0; k < work.stack[3].size(); ++k) {
+            CAPTURE(k);
+            CHECK(work.stack[3](k) == expected(k));            
+        }
+    }
+}
+// LCOV_EXCL_STOP
