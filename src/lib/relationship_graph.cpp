@@ -167,7 +167,10 @@ void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] RelationshipGraph::ConstructGraph") {
+namespace {
+class Test_ConstructGraph : public mutk::RelationshipGraph {
+
+TEST_CASE_CLASS("[libmutk] RelationshipGraph::ConstructGraph") {
     SUBCASE("InheritanceModel::Autosomal") {
         const char ped[] = 
             "##PEDNG v0.1\n"
@@ -180,7 +183,8 @@ TEST_CASE("[libmutk] RelationshipGraph::ConstructGraph") {
         Pedigree pedigree;
         REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
 
-        mutk::RelationshipGraph relationship_graph;
+        Test_ConstructGraph relationship_graph;
+
         REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
             known_samples, mutk::InheritanceModel::Autosomal,
             1e-6, 1e-6, false));
@@ -243,8 +247,17 @@ TEST_CASE("[libmutk] RelationshipGraph::ConstructGraph") {
         REQUIRE(adj4.size() == 0);
         REQUIRE(inv4.size() == 1);
         CHECK(inv3[0] == 1);
+
+        CHECK(relationship_graph.founders_.first == 0);
+        CHECK(relationship_graph.founders_.second == 2);
+        CHECK(relationship_graph.descendants_.first == 2);
+        CHECK(relationship_graph.descendants_.second == 2);
+        CHECK(relationship_graph.samples_.first == 2);
+        CHECK(relationship_graph.samples_.second == 5);
     }
 }
+};
+} //namespace anon
 // LCOV_EXCL_STOP
 
 void mutk::RelationshipGraph::ConstructPeeler() {
@@ -421,7 +434,10 @@ void mutk::RelationshipGraph::ConstructPeeler() {
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] RelationshipGraph::ConstructPeeler") {
+namespace {
+class Test_ConstructPeeler : public mutk::RelationshipGraph {
+
+TEST_CASE_CLASS("[libmutk] RelationshipGraph::ConstructPeeler") {
     using Potential = mutk::detail::Potential;
     SUBCASE("InheritanceModel::Autosomal") {
         const char ped[] = 
@@ -434,13 +450,13 @@ TEST_CASE("[libmutk] RelationshipGraph::ConstructPeeler") {
         Pedigree pedigree;
         REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
 
-        mutk::RelationshipGraph relationship_graph;
+        Test_ConstructPeeler relationship_graph;
         REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
             known_samples, mutk::InheritanceModel::Autosomal,
             1e-6, 1e-6, false));
         REQUIRE_NOTHROW(relationship_graph.ConstructPeeler());
 
-        auto &potentials = relationship_graph.potentials();
+        auto &potentials = relationship_graph.potentials_;
 
         REQUIRE(potentials.size() == 3+2+3+1);
 
@@ -493,6 +509,8 @@ TEST_CASE("[libmutk] RelationshipGraph::ConstructPeeler") {
         CHECK(potentials[8].parents[1].second == 0.0f);
     }
 }
+};
+} // anon namespace
 // LCOV_EXCL_STOP
 
 mutk::RelationshipGraph::workspace_t
