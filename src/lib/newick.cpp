@@ -104,7 +104,7 @@ auto const node_def = tip | inode;
 auto const tip_def = (label >> length)[make_tip];
 auto const inode_def = (('(' >> (node % ',') >> ')') >> ilabel >> length)[make_inode];
 
-auto const label_def = +(alnum | char_("_-%/."));
+auto const label_def = +char_("-0-9A-Za-z/%_.");
 auto const ilabel_def = label | attr("");
 auto const length_def = (':' >> float_) | attr(1.0);
 
