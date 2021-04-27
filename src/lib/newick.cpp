@@ -104,7 +104,7 @@ auto const node_def = tip | inode;
 auto const tip_def = (label >> length)[make_tip];
 auto const inode_def = (('(' >> (node % ',') >> ')') >> ilabel >> length)[make_inode];
 
-auto const label_def = +(alnum | char_("_-%/."));
+auto const label_def = +char_("-0-9A-Za-z/%_.");
 auto const ilabel_def = label | attr("");
 auto const length_def = (':' >> float_) | attr(1.0);
 
@@ -206,6 +206,25 @@ TEST_CASE("[libmutk] detail::parse_newick") {
     CHECK(get(edge_length, G, edge(4,8,G).first) == 1.0f/3.0f);
     CHECK(get(edge_length, G, edge(5,6,G).first) == 1.0f/3.0f);
     CHECK(get(edge_length, G, edge(5,7,G).first) == 1.0f/3.0f);
+
+	SUBCASE("Label parsing with non alphanumerical characters") {
+		mutk::detail::pedigree_graph::Graph H;
+		add_vertex({"Root_0", {Sex::Male, 2}},H);
+
+		REQUIRE(parse_newick("(B/b:6.0,(A-a:5.0,.C:3.0,/E:4.0)Ancestor%1:5.0,D.d:11.0)F--f:1.0;", H, 0, false));
+
+		REQUIRE(num_vertices(H) == 8);
+		REQUIRE(num_edges(H) == 7);
+
+		CHECK(get(vertex_label, H, 0) == "Root_0");
+		CHECK(get(vertex_label, H, 1) == "F--f");
+		CHECK(get(vertex_label, H, 2) == "B/b");
+		CHECK(get(vertex_label, H, 3) == "Ancestor%1");
+		CHECK(get(vertex_label, H, 4) == "A-a");
+		CHECK(get(vertex_label, H, 5) == ".C");
+		CHECK(get(vertex_label, H, 6) == "/E");
+		CHECK(get(vertex_label, H, 7) == "D.d");
+	}
 }
 
 }
