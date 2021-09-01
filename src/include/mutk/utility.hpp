@@ -31,6 +31,7 @@
 #include <fstream>
 #include <cmath>
 #include <cfloat>
+#include <optional>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/tokenizer.hpp>

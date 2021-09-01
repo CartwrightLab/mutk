@@ -104,7 +104,7 @@ auto const node_def = tip | inode;
 auto const tip_def = (label >> length)[make_tip];
 auto const inode_def = (('(' >> (node % ',') >> ')') >> ilabel >> length)[make_inode];
 
-auto const label_def = +(alnum | char_("_-%/."));
+auto const label_def = +(alnum | char_("-_%/."));
 auto const ilabel_def = label | attr("");
 auto const length_def = (':' >> float_) | attr(1.0);
 
@@ -166,12 +166,12 @@ TEST_CASE("[libmutk] detail::parse_newick") {
     mutk::detail::pedigree_graph::Graph G;
     add_vertex({"Root", {Sex::Male, 2}},G);
 
-    REQUIRE(parse_newick("(A:0.1,B:0.2)C:0.4", G, 0, false));
+    REQUIRE(parse_newick("(A:0.1,B:0.2)C_test:0.4", G, 0, false));
     REQUIRE(num_vertices(G) == 4);
     REQUIRE(num_edges(G) == 3);
 
     CHECK(get(vertex_label, G, 0) == "Root");
-    CHECK(get(vertex_label, G, 1) == "C");
+    CHECK(get(vertex_label, G, 1) == "C_test");
     CHECK(get(vertex_label, G, 2) == "A");
     CHECK(get(vertex_label, G, 3) == "B");
     CHECK(get(vertex_sex, G, 0) == Sex::Male);
