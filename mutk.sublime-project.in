@@ -2,7 +2,7 @@
 	"folders":
 	[
 		{
-			"path": "@CMAKE_SOURCE_DIR@",
+			"path": "@source_dir@",
 			"folder_exclude_patterns": ["build"]
 		}
 	],
@@ -16,10 +16,10 @@
         ],
         "ecc_header_to_source_mapping": [
             "./{stamp}.cpp",
-            "@CMAKE_SOURCE_DIR@/src/lib/{stamp}.cpp",
-            "@CMAKE_SOURCE_DIR@/src/{stamp}.cpp",
-            "@CMAKE_SOURCE_DIR@/src/lib/",
-            "@CMAKE_SOURCE_DIR@/src/"
+            "@source_dir@/src/lib/{stamp}.cpp",
+            "@source_dir@/src/{stamp}.cpp",
+            "@source_dir@/src/lib/",
+            "@source_dir@/src/"
         ]
 	},
     "SublimeLinter": {
@@ -40,25 +40,25 @@
 	"build_systems":
 	[
 		{
-			"name": "@PROJECT_NAME@ - all",
+			"name": "@project_name@ - all",
 			"cmd": ["@CMAKE_COMMAND@", "--build", "${project_path}", "--target", "all"],
 			"working_dir": "${project_path}",
 			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
 		},
 		{
-			"name": "@PROJECT_NAME@ - test",
+			"name": "@project_name@ - test",
 			"cmd": ["@CMAKE_COMMAND@", "--build", "${project_path}", "--target", "test"],
 			"working_dir": "${project_path}",
 			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
 		},
         {
-            "name": "@PROJECT_NAME@ - clean",
+            "name": "@project_name@ - clean",
             "cmd": ["@CMAKE_COMMAND@", "--build", "${project_path}", "--target", "clean"],
             "working_dir": "${project_path}",
             "file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"
         },
         {
-            "name": "@PROJECT_NAME@ - check_all",
+            "name": "@project_name@ - check_all",
             "cmd": ["@CMAKE_COMMAND@", "--build", "${project_path}", "--target", "check_all"],
             "working_dir": "${project_path}",
             "file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$"

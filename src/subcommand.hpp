@@ -55,7 +55,7 @@ int check_version_number() {
 /*spacer*/
 
 inline std::string create_program_name(std::string_view name) {
-    const char *p = MUTK_VERSION_STRING;
+    const char * const p = MUTK_VERSION_STRING;
     std::string ret{"mutk "};
     ret += name;
     ret += " v";
