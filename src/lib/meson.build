@@ -9,7 +9,8 @@ libmutk_sources = [
   'mutation.cpp'
 ]
 
-libmutk = static_library('mutk', libmutk_sources,
+libmutk = static_library('mutk', [libmutk_sources, version_file],
 	include_directories : inc,
-	dependencies : [boost_dep, doctest_dep, eigen_dep]
+	dependencies : [boost_dep, doctest_dep, eigen_dep],
+  cpp_args : ['-DDOCTEST_CONFIG_DISABLE']
 )

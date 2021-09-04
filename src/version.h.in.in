@@ -1,0 +1,10 @@
+#ifndef MUTK_VERSION_H_FILE
+#define MUTK_VERSION_H_FILE
+
+#define MUTK_VERSION_STRING  "@version_vcs@"
+#define MUTK_VERSION_INTEGER  @version_int@
+#define MUTK_VERSION_MAJOR    @version_major@
+#define MUTK_VERSION_MINOR    @version_minor@
+#define MUTK_VERSION_PATCH    @version_patch@
+
+#endif // MUTK_VERSION_H_FILE

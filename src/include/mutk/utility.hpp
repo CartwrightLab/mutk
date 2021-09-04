@@ -176,9 +176,9 @@ private:
 
 inline
 File::File(File&& other) : 
-    buffer_{std::move(other.buffer_)},
     path_{std::move(other.path_)},
-    type_label_{std::move(other.type_label_)}
+    type_label_{std::move(other.type_label_)},
+    buffer_{std::move(other.buffer_)}
 {
     std::streambuf *buffer = other.stream_.rdbuf();
     Attach(buffer);

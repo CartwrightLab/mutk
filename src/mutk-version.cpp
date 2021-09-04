@@ -24,6 +24,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <mutk/mutk.hpp>
 
 #include "subcommand.hpp"
@@ -31,6 +32,9 @@
 int main(int /*argc*/, char* /*argv*/[]) {
     MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
 
-    std::cout << "MUTK v" MUTK_VERSION << std::endl;
+    const char* version_str = MUTK_VERSION_STRING;
+    bool from_git = version_str[0] == 'v';
+
+    std::cout << "MUTK v" << (version_str+from_git)  << std::endl;
     return EXIT_SUCCESS;
 }
