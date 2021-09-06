@@ -1,6 +1,6 @@
 # Process version information
 semver = meson.project_version().split('.')
-configure_file(input : 'version.h.in.in',
+version_src = configure_file(input : 'version.h.in.in',
   output : 'version.h.in',
   configuration : {
     'version_major' : semver[0],
@@ -9,10 +9,8 @@ configure_file(input : 'version.h.in.in',
     'version_int'   : (semver[0].to_int()*1000+semver[1].to_int())*10000+semver[2].to_int(),
     'version_vcs'   : '@VCS_TAG@'
   })
-version_file = vcs_tag(
-    input : meson.current_build_dir() / 'version.h.in',
-    output : 'version.h'
-    )
+
+version_file = vcs_tag( input : version_src, output : 'version.h' )
 
 inc = include_directories(['.','include'])
 
@@ -30,6 +28,22 @@ foreach p : progs
     link_with : [libmutk],
     include_directories : inc,
     dependencies : [eigen_dep, cli_dep, htslib_dep, minionrng_dep],
-    cpp_args : ['-DDOCTEST_CONFIG_DISABLE']
+    cpp_args : ['-DDOCTEST_CONFIG_DISABLE'],
+    install : true,
+    install_dir : get_option('libexecdir')
   )
 endforeach
+
+mutk_src = configure_file(input : 'mutk.cpp.in',
+  output : 'mutk.cpp',
+  configuration : {
+    'source_dir' : meson.current_source_dir(),
+    'prefix' : get_option('prefix'),
+    'libexecdir' : get_option('libexecdir')
+  })
+
+executable('mutk', [mutk_src, version_file],
+  include_directories : inc,
+  link_with : [libmutk],
+  install : true
+  )

@@ -29,9 +29,9 @@
 
 #include <mutk/mutk.hpp>
 
-#include "@CMAKE_CURRENT_SOURCE_DIR@/subcommand.hpp"
+#include "@source_dir@/subcommand.hpp"
 
-const char libexec_dir[] = "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@";
+const char libexec_dir[] = "@prefix@/@libexecdir@";
 
 int main(int argc, char * const argv[]) {
     MUTK_RUNTIME_CHECK_VERSION_NUMBER_OR_RETURN();
@@ -60,4 +60,5 @@ int main(int argc, char * const argv[]) {
     if(result != 0) {
         return EXIT_FAILURE;
     }
+    return EXIT_SUCCESS;
 }
