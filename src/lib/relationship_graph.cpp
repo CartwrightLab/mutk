@@ -170,7 +170,7 @@ void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
 namespace {
 class ConstructGraphTest : public mutk::RelationshipGraph {
     using RelationshipGraph = ConstructGraphTest;
-TEST_CASE_CLASS("[libmutk] RelationshipGraph::ConstructGraph") {
+TEST_CASE_CLASS("RelationshipGraph-ConstructGraph") {
     SUBCASE("InheritanceModel::Autosomal") {
         const char ped[] = 
             "##PEDNG v0.1\n"
@@ -437,7 +437,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
 namespace {
 class Test_ConstructPeeler : public mutk::RelationshipGraph {
 
-TEST_CASE_CLASS("[libmutk] RelationshipGraph::ConstructPeeler") {
+TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler") {
     using Potential = mutk::detail::Potential;
     SUBCASE("InheritanceModel::Autosomal") {
         const char ped[] = 
@@ -1386,7 +1386,7 @@ junction_tree::Graph create_junction_tree(
 
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] GeneralPeelingVertex<N>::Forward") {
+TEST_CASE("GeneralPeelingVertex<N>-Forward") {
     mutk::RelationshipGraph::workspace_t work;
     work.scale = 0.0;
     work.widths = {1, 2, 3};

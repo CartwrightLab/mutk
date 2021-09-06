@@ -156,7 +156,7 @@ bool parse_newick(const std::string &text, pedigree_graph::Graph &graph,
     return true;
 }
 
-TEST_CASE("[libmutk] detail::parse_newick") {
+TEST_CASE("parse_newick") {
     using mutk::detail::parse_newick;
     using boost::edge_length;
     using boost::vertex_label;

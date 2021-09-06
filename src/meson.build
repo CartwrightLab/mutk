@@ -33,9 +33,3 @@ foreach p : progs
     cpp_args : ['-DDOCTEST_CONFIG_DISABLE']
   )
 endforeach
-
-doctest_exe = executable('mutk-doctest', ['mutk-doctest.cpp', version_file],
-  link_whole : [libmutk_doctest],
-  include_directories : inc,
-  dependencies : [doctest_dep, eigen_dep, cli_dep, htslib_dep, minionrng_dep]
-)

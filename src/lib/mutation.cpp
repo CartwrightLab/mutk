@@ -93,7 +93,7 @@ using KAllelesModel = mutk::mutation::KAllelesModel;
 using potential_t = mutk::RelationshipGraph::potential_t;
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] mutation::KAllelesModel::KAllelesModel") {
+TEST_CASE("KAllelesModel-Constructor") {
     CHECK_NOTHROW(KAllelesModel(4.0, 0.001, 0.0, 0.0, 0.0));
     CHECK_THROWS_AS(KAllelesModel(1.0, 0.001, 0.0, 0.0, 0.0), std::invalid_argument);
     CHECK_THROWS_AS(KAllelesModel(4.0, -0.1, 0.0, 0.0, 0.0), std::invalid_argument);
@@ -125,7 +125,7 @@ KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, any_t) const
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] mutation::KAllelesModel::CreateMatrix with any_t") {
+TEST_CASE("KAllelesModel-CreateMatrix with any_t") {
     using namespace boost::numeric::ublas;
     
     auto test = [&](int n, float u, float k) {
@@ -193,7 +193,7 @@ KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, int x) const
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] mutation::KAllelesModel::CreateMatrix with int") {
+TEST_CASE("KAllelesModel-CreateMatrix with int") {
     using namespace boost::numeric::ublas;
     
     auto test = [&](int n, float u, float k) {
@@ -265,7 +265,7 @@ KAllelesModel::matrix_t KAllelesModel::CreateMatrix(int n, float t, mean_t) cons
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] mutation::KAllelesModel::CreateMatrix with mean_t") {
+TEST_CASE("KAllelesModel-CreateMatrix with mean_t") {
     using namespace boost::numeric::ublas;
     
     auto test = [&](int n, float u, float k) {
@@ -332,7 +332,7 @@ KAllelesModel::tensor_t KAllelesModel::CreatePriorHaploid(int n) const {
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] mutation::KAllelesModel::CreatePriorHaploid") {
+TEST_CASE("KAllelesModel-CreatePriorHaploid") {
     auto test_haploid = [](int n, float theta, float hap_bias,
         float k) {
         CAPTURE(n);
@@ -404,7 +404,7 @@ KAllelesModel::tensor_t KAllelesModel::CreatePriorDiploid(int n) const {
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] mutation::KAllelesModel::CreatePriorDiploid") {
+TEST_CASE("KAllelesModel-CreatePriorDiploid") {
     auto test_diploid = [](int n, float theta, float hom_bias,
         float het_bias, float k) {
         CAPTURE(n);
@@ -661,7 +661,7 @@ mutk::Tensor<2> create_transition_clone_diploid(const mutk::mutation::Model &mod
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_clone_diploid") {
+TEST_CASE("create_transition_clone_diploid") {
     SUBCASE("Passing mutk::mutation::ANY as argument.") {
         auto test = [&](int n, float u, float k, std::vector<int> shuf) {
             CAPTURE(n);
@@ -838,7 +838,7 @@ mutk::Tensor<2> create_transition_clone_haploid(const mutk::mutation::Model &mod
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_clone_haploid") {
+TEST_CASE("create_transition_clone_haploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -891,7 +891,7 @@ mutk::Tensor<2> create_transition_gamete_diploid(const mutk::mutation::Model &mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_gamete_diploid") {
+TEST_CASE("create_transition_gamete_diploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -947,7 +947,7 @@ mutk::Tensor<3> create_transition_child_diploid_diploid(const mutk::mutation::Mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_child_diploid_diploid") {
+TEST_CASE("create_transition_child_diploid_diploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -1026,7 +1026,7 @@ mutk::Tensor<3> create_transition_child_haploid_diploid(const mutk::mutation::Mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_child_haploid_diploid") {
+TEST_CASE("create_transition_child_haploid_diploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -1101,7 +1101,7 @@ mutk::Tensor<3> create_transition_child_diploid_haploid(const mutk::mutation::Mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_child_diploid_haploid") {
+TEST_CASE("create_transition_child_diploid_haploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -1176,7 +1176,7 @@ mutk::Tensor<3> create_transition_child_haploid_haploid(const mutk::mutation::Mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_child_haploid_haploid") {
+TEST_CASE("create_transition_child_haploid_haploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -1247,7 +1247,7 @@ mutk::Tensor<2> create_transition_child_selfing_diploid(const mutk::mutation::Mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_child_selfing_diploid") {
+TEST_CASE("create_transition_child_selfing_diploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);
@@ -1316,7 +1316,7 @@ mutk::Tensor<2> create_transition_child_selfing_haploid(const mutk::mutation::Mo
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] create_transition_child_selfing_haploid") {
+TEST_CASE("create_transition_child_selfing_haploid") {
     auto test = [&](int n, float u, float k, std::vector<int> shuf) {
         CAPTURE(n);
         CAPTURE(k);

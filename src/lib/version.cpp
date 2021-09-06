@@ -38,13 +38,13 @@ bool mutk::version_number_check_equal(int version_int) {
     return version_int == MUTK_VERSION_INTEGER;
 }
 
-TEST_CASE("[libmutk] version_number_check_equal") {
+TEST_CASE("version_number_check_equal") {
     CHECK(mutk::version_number_check_equal(MUTK_VERSION_INTEGER) == true);
     CHECK(mutk::version_number_check_equal(-1) == false);
 }
 
 int mutk::version_integer() { return MUTK_VERSION_INTEGER; }
 
-TEST_CASE("[libmutk] version_integer") {
+TEST_CASE("version_integer") {
     CHECK(mutk::version_integer() == MUTK_VERSION_INTEGER);
 }
