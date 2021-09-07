@@ -28,8 +28,13 @@ jobs:
       - uses: BSFishy/meson-build@v1.0.3
         with:
           action: test
-          directory: build
+          directory: builddir
           setup-options: -Db_coverage=true
+          options: --verbose
           meson-version: 0.59.1
           ninja-version: 1.10.2
-
+      - uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: Linux_Meson_Testlog
+          path: builddir/meson-logs/testlog.txt
