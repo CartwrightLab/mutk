@@ -21,6 +21,10 @@ jobs:
           python-version: '3.x'
       - name: Install Boost
         run: sudo apt-get update && sudo apt-get install -yq libboost-all-dev
+      - name: Install Eigen
+        run: sudo apt-get update && sudo apt-get install -yq libeigen3-dev
+      - name: Install HTSLib
+        run: sudo apt-get update && sudo apt-get install -yq libhts-dev
       - uses: BSFishy/meson-build@v1.0.3
         with:
           action: test
