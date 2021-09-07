@@ -31,20 +31,20 @@ static_assert(MUTK_VERSION_MAJOR >= 0 && MUTK_VERSION_MAJOR < 1000,  // NOLINT
               "MUTK major version must be less than 1000.");
 static_assert(MUTK_VERSION_MINOR >= 0 && MUTK_VERSION_MINOR < 1000,  // NOLINT
               "MUTK minor version must be less than 1000.");
-static_assert(MUTK_VERSION_PATCH >= 0 && MUTK_VERSION_PATCH < 1000,  // NOLINT
-              "MUTK patch version must be less than 1000.");
+static_assert(MUTK_VERSION_PATCH >= 0 && MUTK_VERSION_PATCH < 10000,  // NOLINT
+              "MUTK patch version must be less than 10000.");
 
 bool mutk::version_number_check_equal(int version_int) {
     return version_int == MUTK_VERSION_INTEGER;
 }
 
-TEST_CASE("[libmutk] version_number_check_equal") {
+TEST_CASE("version_number_check_equal") {
     CHECK(mutk::version_number_check_equal(MUTK_VERSION_INTEGER) == true);
     CHECK(mutk::version_number_check_equal(-1) == false);
 }
 
 int mutk::version_integer() { return MUTK_VERSION_INTEGER; }
 
-TEST_CASE("[libmutk] version_integer") {
+TEST_CASE("version_integer") {
     CHECK(mutk::version_integer() == MUTK_VERSION_INTEGER);
 }

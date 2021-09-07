@@ -138,7 +138,7 @@ Pedigree Pedigree::parse_table(const std::vector<std::vector<std::string>> &tabl
 }
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] Pedigree::parse_sex") {
+TEST_CASE("Pedigree-parse_sex") {
     CHECK(Pedigree::parse_sex(".") == Pedigree::Sex::Invalid);
     CHECK(Pedigree::parse_sex("0") == Pedigree::Sex::Autosomal);
     CHECK(Pedigree::parse_sex("1") == Pedigree::Sex::Male);
@@ -155,7 +155,7 @@ TEST_CASE("[libmutk] Pedigree::parse_sex") {
 // LCOV_EXCL_STOP
 
 // LCOV_EXCL_START
-TEST_CASE("[libmutk] Pedigree::parse_text") {
+TEST_CASE("Pedigree-parse_text") {
     const char ped[] = 
         "##PEDNG v1.0\n"
         "A . . 1 .\n"

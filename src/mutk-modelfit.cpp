@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 
     args_t args;
 
-    CLI::App app{"mutk modelfit v" MUTK_VERSION};
+    CLI::App app{mutk::subcommand::create_program_name("modelfit")};
 
     #define ADD_OPTION_(name, desc) app.add_option(#name##_opt, args.name, desc, true)
 

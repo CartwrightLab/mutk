@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
     using namespace mutk::subcommand::string_literals;
 
-    CLI::App app{"mutk graph v" MUTK_VERSION};
+    CLI::App app{mutk::subcommand::create_program_name("graph")};
 
     #define ADD_OPTION_(name, desc) app.add_option(#name##_opt, args.name, desc, true)
 

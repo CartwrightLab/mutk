@@ -31,6 +31,7 @@
 #include <fstream>
 #include <cmath>
 #include <cfloat>
+#include <optional>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/tokenizer.hpp>
@@ -44,7 +45,6 @@
 
 namespace mutk {
 namespace utility {
-
 
 // Key search functions
 template<typename Range, typename Value>
@@ -175,9 +175,9 @@ private:
 
 inline
 File::File(File&& other) : 
-    buffer_{std::move(other.buffer_)},
     path_{std::move(other.path_)},
-    type_label_{std::move(other.type_label_)}
+    type_label_{std::move(other.type_label_)},
+    buffer_{std::move(other.buffer_)}
 {
     std::streambuf *buffer = other.stream_.rdbuf();
     Attach(buffer);
