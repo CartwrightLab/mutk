@@ -62,7 +62,6 @@ inline std::string create_program_name(std::string_view name) {
     ret += (p + (p[0] == 'v')); // avoid vv
     return ret;
 }
-
 namespace string_literals {
 
 std::string operator"" _opt(const char* p, std::size_t n) {

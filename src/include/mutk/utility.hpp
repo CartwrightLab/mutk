@@ -46,7 +46,6 @@
 namespace mutk {
 namespace utility {
 
-
 // Key search functions
 template<typename Range, typename Value>
 inline

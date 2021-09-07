@@ -168,8 +168,7 @@ void mutk::RelationshipGraph::ConstructGraph(const Pedigree& pedigree,
 
 // LCOV_EXCL_START
 namespace {
-class ConstructGraphTest : public mutk::RelationshipGraph {
-    using RelationshipGraph = ConstructGraphTest;
+class Test_ConstructGraph : public mutk::RelationshipGraph {
 TEST_CASE_CLASS("RelationshipGraph-ConstructGraph") {
     SUBCASE("InheritanceModel::Autosomal") {
         const char ped[] = 
@@ -183,7 +182,7 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructGraph") {
         Pedigree pedigree;
         REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
 
-        RelationshipGraph relationship_graph;
+        Test_ConstructGraph relationship_graph;
 
         REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
             known_samples, mutk::InheritanceModel::Autosomal,
@@ -436,7 +435,6 @@ void mutk::RelationshipGraph::ConstructPeeler() {
 // LCOV_EXCL_START
 namespace {
 class Test_ConstructPeeler : public mutk::RelationshipGraph {
-
 TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler") {
     using Potential = mutk::detail::Potential;
     SUBCASE("InheritanceModel::Autosomal") {
