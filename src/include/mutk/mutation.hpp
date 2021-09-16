@@ -77,27 +77,27 @@ constexpr mean_t MEAN = {};
 
 class Model {
 public:
-    using tensor_t = mutk::Tensor<1>;
-    using matrix_t = mutk::Tensor<2>;
+    using tensor_t = mutk::tensor_t;
     using potential_t = mutk::detail::potential_t;
 
-    virtual matrix_t CreateMatrix(int n, float t, any_t) const = 0;
-    virtual matrix_t CreateMatrix(int n, float t, mean_t) const = 0;
-    virtual matrix_t CreateMatrix(int n, float t, int x) const = 0;
+    virtual tensor_t CreateMatrix(int n, float t, any_t) const = 0;
+    virtual tensor_t CreateMatrix(int n, float t, mean_t) const = 0;
+    virtual tensor_t CreateMatrix(int n, float t, int x) const = 0;
 
     virtual tensor_t CreatePriorDiploid(int n) const = 0;
     virtual tensor_t CreatePriorHaploid(int n) const = 0;
 
-    mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, any_t);
-    mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, mean_t);
-    mutk::Tensor<1> CreatePotential(int n, const potential_t &potential, int x);
+    tensor_t CreatePotential(int n, const potential_t &potential, any_t);
+    tensor_t CreatePotential(int n, const potential_t &potential, mean_t);
+    tensor_t CreatePotential(int n, const potential_t &potential, int x);
+
+    virtual ~Model() = default;
 };
 
 // A k-alleles model. See Lewis 2001 and Tuffley and Steel 1997.
 class KAllelesModel : public Model {
 public:
     using tensor_t = Model::tensor_t;
-    using matrix_t = Model::matrix_t;
 
     KAllelesModel(double k, double theta, double hom_bias, double het_bias, double hap_bias) : 
         k_{k}, theta_{theta}, hom_bias_{hom_bias}, het_bias_{het_bias}, hap_bias_{hap_bias} {
@@ -121,9 +121,9 @@ public:
         }
     }
 
-    virtual matrix_t CreateMatrix(int n, float t, any_t) const override;
-    virtual matrix_t CreateMatrix(int n, float t, mean_t) const override;
-    virtual matrix_t CreateMatrix(int n, float t, int x) const override;
+    virtual tensor_t CreateMatrix(int n, float t, any_t) const override;
+    virtual tensor_t CreateMatrix(int n, float t, mean_t) const override;
+    virtual tensor_t CreateMatrix(int n, float t, int x) const override;
 
     virtual tensor_t CreatePriorDiploid(int n) const override;
     virtual tensor_t CreatePriorHaploid(int n) const override;

@@ -14,7 +14,7 @@ version_file = vcs_tag( input : version_src, output : 'version.h' )
 
 inc = include_directories(['.','include'])
 
-boost_dep = dependency('boost')
+boost_dep = dependency('boost', modules : [])
 eigen_dep = dependency('eigen3')
 htslib_dep = dependency('htslib')
 

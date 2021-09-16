@@ -108,18 +108,17 @@ const std::map<std::string, InheritanceModel> mutk::detail::CHR_MODEL_MAP {
     {"zlinked", InheritanceModel::ZLinked},
 };
 
-float mutk::RelationshipGraph::PeelForward(workspace_t *work) const {
-    assert(work != nullptr);
-    assert(work->stack.size() >= stack_size_);
+float mutk::RelationshipGraph::PeelForward(workspace_t &work) const {
+    assert(work.stack.size() >= stack_size_);
 
     for(auto &&peeler : peelers_) {
         peeler->Forward(work);
     }
-    float log_ret = work->scale;
+    float log_ret = work.scale;
 
     for(auto r : roots_) {
-        mutk::Tensor<0> s = work->stack[r].sum();
-        log_ret += log(s(0));
+        float s = xt::sum(work.stack[r])();
+        log_ret += std::log(s);
     }
     return log_ret;
 }
@@ -331,6 +330,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     }
 
     // sort the labels of each jctnode according to elimination rank
+    // elimination_rand_[id] = at what step `id` is eliminated
     elimination_rank_.resize(num_vertices(graph_));
     for(size_t n = 0; n < elim_steps.first.size(); ++n) {
         elimination_rank_[elim_steps.first[n]] = n;
@@ -364,9 +364,6 @@ void mutk::RelationshipGraph::ConstructPeeler() {
         }
     }
 
-    // ploidy information
-    auto ploidies = get(boost::vertex_ploidy, graph_);
-
     // The first part of the stack refers to potentials
     // Counter will track all the additional messages
     // that we need to store during peeling
@@ -378,35 +375,8 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     // iterate the junction tree in reverse order
     auto rev_jctnode_range = boost::adaptors::reverse(jctnode_range);
     for(auto &&v : rev_jctnode_range) {
-        peeling_t peeler;
+        peeling_t peeler = std::make_unique<GeneralPeelingVertex>(tensor_labels[v]);
 
-        std::vector<int> tensor_ploidies(tensor_labels[v].size());
-        boost::range::transform(tensor_labels[v],
-            tensor_ploidies.begin(), [&](auto &a){
-            return ploidies[a];
-        });
-
-        switch(tensor_labels[v].size()) {
-        case 1:
-            peeler = std::make_unique<GeneralPeelingVertex<1>>(tensor_labels[v],
-                counter++, tensor_ploidies);
-            break;
-        case 2:
-            peeler = std::make_unique<GeneralPeelingVertex<2>>(tensor_labels[v],
-                counter++, tensor_ploidies);
-            break;
-        case 3:
-            peeler = std::make_unique<GeneralPeelingVertex<3>>(tensor_labels[v],
-                counter++, tensor_ploidies);
-            break;
-        case 4:
-            peeler = std::make_unique<GeneralPeelingVertex<4>>(tensor_labels[v],
-                counter++, tensor_ploidies);
-            break;
-        default:
-            // should not get here
-            assert(false);
-        }
         peeler->AddLocal(tensor_labels[v], jctnode_to_potential[v]);
 
         auto adj_range = boost::make_iterator_range(adjacent_vertices(v, junction_tree_));
@@ -425,7 +395,6 @@ void mutk::RelationshipGraph::ConstructPeeler() {
             peeler->AddOutput({}, counter);
             roots_.push_back(v);
             output_index[v] = counter++;
-
         }
         peelers_.push_back(std::move(peeler));
     }
@@ -514,9 +483,7 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler") {
 mutk::RelationshipGraph::workspace_t
 mutk::RelationshipGraph::CreateWorkspace() const {
     workspace_t work;
-
     work.stack.resize(stack_size_);
-    
     return work;    
 }
 
@@ -1130,7 +1097,6 @@ create_potentials(const pedigree_graph::Graph &graph) {
     using vertex_t = pedigree_graph::vertex_t;
     using Potential = mutk::RelationshipGraph::Potential;
 
-    auto types = get(boost::vertex_type, graph);
     auto ploidies = get(boost::vertex_ploidy, graph);
     auto lengths = get(boost::edge_length, graph);
 
@@ -1219,16 +1185,12 @@ using heap_t = boost::heap::d_ary_heap<record_t,
     boost::heap::arity<2>, boost::heap::mutable_<true>,
     boost::heap::compare<record_cmp_t>>;
 
-
-
 // Almond and Kong (1991) Optimality Issues in Constructing a Markov Tree from Graphical Models.
 //     Research Report 329. University of Chicago, Dept. of Statistics
 std::pair<std::vector<pedigree_graph::vertex_t>,
 std::vector<neighbors_t>>
 triangulate_graph(const pedigree_graph::Graph &graph) {
     using vertex_t = pedigree_graph::vertex_t;
-
-    auto types = get(boost::vertex_type, graph);
 
     auto vertex_range = boost::make_iterator_range(vertices(graph));
 
@@ -1246,7 +1208,7 @@ triangulate_graph(const pedigree_graph::Graph &graph) {
                 // connect each of the parents to one another
                 auto p2 = source(*it2, graph);
                 neighbors[p1].insert(p2);
-                neighbors[p2].insert(p1);                
+                neighbors[p2].insert(p1);
             }
         }
     }
@@ -1380,79 +1342,133 @@ junction_tree::Graph create_junction_tree(
     return ret;
 }
 
+mutk::shape_t calc_reshape(mutk::shape_t a, const mutk::shape_t& b) {
+    std::transform(a.begin(), a.end(), b.begin(), a.begin(), [&](auto x, auto y) {
+        return (y == 0) ? 1 : x;
+    });
+    return a;
+}
+
 } // anon namespace 
 
+// Forward Algorithm:
+void mutk::GeneralPeelingVertex::Forward(PeelingVertex::workspace_t &work) const {
+    // copy local data to local buffer
+    temporary_ = work.stack[local_data_.index];
+    for(int i=0;i<input_data_.size(); ++i) {
+        auto dims = calc_reshape(temporary_.shape(), input_data_[i].shape);
+        temporary_ *= xt::reshape_view(work.stack[input_data_[i].index], dims);
+    }
+    work.stack[output_data_.index] = xt::sum(temporary_, output_data_.shape);
+}
 
 // LCOV_EXCL_START
-TEST_CASE("GeneralPeelingVertex<N>-Forward") {
+TEST_CASE("GeneralPeelingVertex-Forward") {
+    using tensor_t = mutk::tensor_t;
     mutk::RelationshipGraph::workspace_t work;
     work.scale = 0.0;
-    work.widths = {1, 2, 3};
     work.stack.resize(10);
 
-    SUBCASE("N = 1") {
-        // Buffer
-        work.stack[0].resize(3);
-        work.stack[0].setConstant(-1.0);
+    SUBCASE("1 Dimensional Vertex") {
         // Local
-        work.stack[1].resize(3);
-        work.stack[1].setConstant(1.0);
+        work.stack[0] = tensor_t({3}, 1.0);
         // Input
-        work.stack[2].resize(3);
-        work.stack[2].setConstant(0.5);
+        work.stack[1] = tensor_t({3}, 0.5);
         // Output
-        work.stack[3].resize(0);
+        work.stack[2].resize(0);
 
-        mutk::Tensor<1> expected = work.stack[1] * work.stack[2];
+        tensor_t expected = work.stack[0] * work.stack[1];
 
-        mutk::GeneralPeelingVertex<1> v({0}, 0, {2});
-        v.AddLocal({0}, 1);
-        v.AddInput({0}, 2);
-        v.AddOutput({0},3);
-        v.Forward(&work);
+        mutk::GeneralPeelingVertex v({0});
+        v.AddLocal({0}, 0);
+        v.AddInput({0}, 1);
+        v.AddOutput({0},2);
+        v.Forward(work);
 
-        REQUIRE(work.stack[3].size() == 3);
-        for(int k=0; k < work.stack[3].size(); ++k) {
+        REQUIRE(work.stack[2].size() == 3);
+        for(int k=0; k < work.stack[2].size(); ++k) {
             CAPTURE(k);
-            CHECK(work.stack[3][k] == expected[k]);            
+            CHECK(work.stack[2][k] == expected[k]);            
         }
     }
-    SUBCASE("N = 2") {
-        // Buffer
-        work.stack[0].resize(3*3);
-        work.stack[0].setConstant(-1.0);
+    SUBCASE("2 Dimensional Vertex") {
         // Local
-        work.stack[1].resize(3*3);
-        work.stack[1].setValues({0.8,0.2,0.3,
-                                 0.1,0.6,0.3,
-                                 0.1,0.2,0.4});
+        work.stack[0] = {{0.8,0.2,0.3},
+                         {0.1,0.6,0.3},
+                         {0.1,0.2,0.4}};
         // Input
-        work.stack[2].resize(3);
-        work.stack[2].setValues({0.0,0.1,0.9});
+        work.stack[1] = {0.0,0.1,0.9};
         // Output
-        work.stack[3].resize(0);
+        work.stack[2].resize(0);
 
         // Expected output
-        mutk::Tensor<1> expected;
-        expected.resize(3);
-        for(int a=0;a<3;++a) {
-            expected(a) = 0.0;
-            for(int b=0;b<3;++b) {
-                expected(a) += work.stack[1](a*3+b)*work.stack[2](b);
-            }
-        }
+        tensor_t expected = xt::linalg::dot(work.stack[0], work.stack[1]);
+        // expected.resize(3);
+        // for(int a=0;a<3;++a) {
+        //     expected(a) = 0.0;
+        //     for(int b=0;b<3;++b) {
+        //         expected(a) += work.stack[0](a,b)*work.stack[1](b);
+        //     }
+        // }
 
-        mutk::GeneralPeelingVertex<2> v({0,1}, 0, {2,2});
-        v.AddLocal({0,1}, 1);
-        v.AddInput({0}, 2);
-        v.AddOutput({1},3);
-        v.Forward(&work);
+        mutk::GeneralPeelingVertex v({0,1});
+        v.AddLocal({0,1}, 0);
+        v.AddInput({0},  1);
+        v.AddOutput({1}, 2);
+        v.Forward(work);
 
-        REQUIRE(work.stack[3].size() == 3);
-        for(int k=0; k < work.stack[3].size(); ++k) {
+        REQUIRE(work.stack[2].size() == 3);
+        for(int k=0; k < work.stack[2].size(); ++k) {
             CAPTURE(k);
-            CHECK(work.stack[3](k) == expected(k));            
+            CHECK(work.stack[2](k) == expected(k));            
         }
     }
 }
 // LCOV_EXCL_STOP
+
+
+mutk::GeneralPeelingVertex::data_t
+mutk::GeneralPeelingVertex::MakeMetadata(const std::vector<PeelingVertex::label_t> &labels,
+    std::size_t buffer_index) const {
+    data_t ret;
+    ret.index = buffer_index;
+    // fill with zeros.
+    ret.shape.assign(labels.size(), 0);
+
+    // Go through the labels for this vertex and see if they are in the Metadata labels
+    // ret.shape[i] is 1 if the label of axis i is in the labels of this vertex
+    for(size_t i = 0; i < labels_.size(); ++i) {
+        auto it = boost::range::find(labels, labels_[i]);
+        if(it != labels.end()) {
+            // our metadata contains the label
+            ret.shape[i] = 1;
+        }
+    }
+    return ret;
+}
+
+void mutk::GeneralPeelingVertex::AddLocal(const std::vector<PeelingVertex::label_t> &labels,
+        std::size_t buffer_index) {
+    local_data_ = MakeMetadata(labels, buffer_index);
+}
+
+void mutk::GeneralPeelingVertex::AddOutput(const std::vector<PeelingVertex::label_t> &labels,
+        std::size_t buffer_index) {
+    output_data_ = MakeMetadata(labels, buffer_index);
+    // for output_data, convert shape to a vector of the axes that need to be 
+    // summed out when creating the output
+    shape_t shape;
+    for(size_t i=0; i < output_data_.shape.size(); ++i) {
+        // if axis is missing in the output, add it to the list that needs to be removed.
+        if(output_data_.shape[i] == 0) {
+            shape.push_back(i);
+        }
+    }
+    // update shape
+    output_data_.shape = shape;
+}
+
+void mutk::GeneralPeelingVertex::AddInput(const std::vector<PeelingVertex::label_t> &labels,
+        std::size_t buffer_index) {
+    input_data_.push_back(MakeMetadata(labels, buffer_index));
+}

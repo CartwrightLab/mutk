@@ -58,9 +58,8 @@ namespace detail {
 extern const std::map<std::string, InheritanceModel> CHR_MODEL_MAP;
 
 struct workspace_t {
-    std::vector<mutk::Tensor<1>> stack;
-    std::array<mutk::tensor_index_t,3> widths;
-    float scale;
+    std::vector<mutk::tensor_t> stack;
+    float_t scale;
 };
 
 } //namespace detail
@@ -84,7 +83,7 @@ public:
 
     void ConstructPeeler();
 
-    float PeelForward(workspace_t *work) const;
+    float PeelForward(workspace_t &work) const;
 
     void PrintGraph(std::ostream &os) const;
 
@@ -113,6 +112,8 @@ protected:
     vertex_range_t samples_;
 
     size_t stack_size_;
+    std::vector<mutk::shape_t> ploidy_shapes_;
+    
 
     // The probability potentials of the relationship graph
     std::vector<potential_t> potentials_;
@@ -140,7 +141,7 @@ public:
 
     virtual ~PeelingVertex() = default;
 
-    virtual void Forward(PeelingVertex::workspace_t *work) const = 0;
+    virtual void Forward(PeelingVertex::workspace_t &work) const = 0;
 
     virtual void AddLocal(const std::vector<PeelingVertex::label_t> &labels,
         std::size_t buffer_index) = 0;
@@ -150,19 +151,16 @@ public:
         std::size_t buffer_index) = 0;
 };
 
-template<std::size_t N>
 class GeneralPeelingVertex : public PeelingVertex {
 public:
-    using tensor_t = mutk::Tensor<N>;
 
     struct data_t {
         std::size_t index;
-        typename tensor_t::Dimensions data_ploidy;
-        typename tensor_t::Dimensions broadcast_ploidy;
+        shape_t shape;
     };
 
-    GeneralPeelingVertex(const std::vector<PeelingVertex::label_t> &labels,
-        std::size_t buffer_index, const std::vector<int> &buffer_ploidy);
+    GeneralPeelingVertex(const std::vector<PeelingVertex::label_t> &labels) :
+        labels_{labels} { }
 
     virtual void AddLocal(const std::vector<PeelingVertex::label_t> &labels,
         std::size_t buffer_index) override;
@@ -173,147 +171,21 @@ public:
 
     virtual ~GeneralPeelingVertex() = default;
 
-    virtual void Forward(PeelingVertex::workspace_t *work) const override;
+    virtual void Forward(PeelingVertex::workspace_t &work) const override;
 
 protected:
     data_t MakeMetadata(const std::vector<PeelingVertex::label_t> &labels,
         std::size_t buffer_index) const;
 
-    std::array<PeelingVertex::label_t,N> labels_;
+    std::vector<PeelingVertex::label_t> labels_;
 
-    data_t buffer_;
+    mutable tensor_t temporary_;
 
     data_t local_data_;
     data_t output_data_;
     std::vector<data_t> input_data_;
 };
 
-namespace detail {
-
-template<typename A>
-auto calc_dims(const PeelingVertex::workspace_t &work, A a) {
-    typename mutk::Tensor<a.size()>::Dimensions ret;
-    std::transform(a.begin(), a.end(), ret.begin(), [&](auto v) {
-        return work.widths[v];
-    });
-    return ret;
-}
-
-}
-
-template<std::size_t N>
-GeneralPeelingVertex<N>::GeneralPeelingVertex(const std::vector<PeelingVertex::label_t> &labels,
-        std::size_t buffer_index, const std::vector<int> &buffer_ploidy) {
-    boost::range::copy(labels, labels_.begin());
-    buffer_.index = buffer_index;
-    boost::range::copy(buffer_ploidy, buffer_.data_ploidy.begin());
-    boost::range::fill(buffer_.broadcast_ploidy, 0);
-}
-
-template<std::size_t N>
-typename GeneralPeelingVertex<N>::data_t
-GeneralPeelingVertex<N>::MakeMetadata(const std::vector<PeelingVertex::label_t> &labels,
-    std::size_t buffer_index) const {
-    data_t ret;
-    ret.index = buffer_index;
-
-    // Go through the labels for this vertex and see if they are in the Metadata labels
-    for(size_t i = 0; i < labels_.size(); ++i) {
-        auto it = boost::range::find(labels, labels_[i]);
-        if(it != labels.end()) {
-            // our metadata contains the label, we will not need to broadcast it
-            ret.data_ploidy[i] = buffer_.data_ploidy[i];
-            ret.broadcast_ploidy[i] = 0;
-        } else {
-            // we will need to broadcast this axis
-            ret.data_ploidy[i] = 0;
-            ret.broadcast_ploidy[i] = buffer_.data_ploidy[i];
-        }
-    }
-    return ret;
-}
-
-template<std::size_t N>
-void GeneralPeelingVertex<N>::AddLocal(const std::vector<PeelingVertex::label_t> &labels,
-        std::size_t buffer_index) {
-    local_data_ = MakeMetadata(labels, buffer_index);
-}
-
-template<std::size_t N>
-void GeneralPeelingVertex<N>::AddOutput(const std::vector<PeelingVertex::label_t> &labels,
-        std::size_t buffer_index) {
-    output_data_ = MakeMetadata(labels, buffer_index);
-}
-
-template<std::size_t N>
-void GeneralPeelingVertex<N>::AddInput(const std::vector<PeelingVertex::label_t> &labels,
-        std::size_t buffer_index) {
-    input_data_.push_back(MakeMetadata(labels, buffer_index));
-}
-
-template<std::size_t N>
-void GeneralPeelingVertex<N>::Forward(PeelingVertex::workspace_t *work) const {
-    // copy local data to local buffer
-    auto dims = detail::calc_dims(*work, local_data_.data_ploidy);
-    if(work->stack[local_data_.index].size() == 0) {
-        // unit potentials are empty
-        work->stack[buffer_.index].resize(dims.TotalSize());
-        work->stack[buffer_.index].setConstant(1.0f);
-    } else {
-        work->stack[buffer_.index] = work->stack[local_data_.index];
-    }
-
-    for(int i=0;i<input_data_.size(); ++i) {
-        auto input_dims = detail::calc_dims(*work, input_data_[i].data_ploidy);
-        auto broadcast_dims = detail::calc_dims(*work, input_data_[i].broadcast_ploidy);
-        work->stack[buffer_.index].reshape(dims) *= 
-            work->stack[input_data_[i].index].reshape(input_dims).broadcast(broadcast_dims);
-    }
-    auto msg_dims = detail::calc_dims(*work, output_data_.data_ploidy);
-    std::vector<typename tensor_t::Index> sum_dims;
-
-    for(typename tensor_t::Index i=0; i < output_data_.data_ploidy.size(); ++i) {
-        if(output_data_.data_ploidy[i] == 0) {
-            sum_dims.push_back(i);
-        }
-    }
-
-    work->stack[output_data_.index].resize(msg_dims.TotalSize());
-    switch(sum_dims.size()) {
-    case 0:
-        work->stack[output_data_.index] = work->stack[buffer_.index];
-        break;
-    case 1:
-        if constexpr( N >= 1 ) {
-            work->stack[output_data_.index].reshape(msg_dims) =
-                work->stack[buffer_.index].reshape(dims)
-                    .sum(Eigen::make_index_list(sum_dims[0])).reshape(msg_dims);
-            break;
-        }
-    case 2:
-        if constexpr( N >= 2 ) {
-            work->stack[output_data_.index].reshape(msg_dims) =
-                work->stack[buffer_.index].reshape(dims)
-                    .sum(Eigen::make_index_list(sum_dims[0],sum_dims[1])).reshape(msg_dims);
-            break;            
-        }
-    case 3:
-        if constexpr( N >= 3 ) {
-            work->stack[output_data_.index].reshape(msg_dims) =
-                work->stack[buffer_.index].reshape(dims)
-                    .sum(Eigen::make_index_list(sum_dims[0],sum_dims[1],sum_dims[2])).reshape(msg_dims);            
-            break;
-        }
-    case 4:
-        if constexpr( N >= 4 ) {
-            work->stack[output_data_.index].reshape(msg_dims) =
-                work->stack[buffer_.index].reshape(dims)
-                    .sum(Eigen::make_index_list(sum_dims[0],sum_dims[1],sum_dims[2],sum_dims[3])).reshape(msg_dims);            
-            break;
-        }        
-    default:
-        assert(false);
-    };
 }
 
 }; // namespace mutk
