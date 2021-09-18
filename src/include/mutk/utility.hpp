@@ -114,16 +114,16 @@ make_tokenizer_dropempty(const Range& text, const char *sep = "\t", const char *
 
 // decode a percent encoded string
 namespace detail {
-void percent_decode_core(std::string *str, size_t start);
+void percent_decode_core(std::string &str, size_t start);
 } // namespace detail
 
 inline
 std::string percent_decode(std::string str) {
     auto pos = str.find('%');
     if(pos != std::string::npos) {
-        detail::percent_decode_core(&str, pos);
+        detail::percent_decode_core(str, pos);
     }
-    return std::move(str);
+    return str;
 }
 
 // extracts extension and filename from both file.foo and ext:file.foo

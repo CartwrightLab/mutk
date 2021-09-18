@@ -27,9 +27,8 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
-void mutk::utility::detail::percent_decode_core(std::string *str, size_t start) {
-    assert(str != nullptr);
-    assert((*str)[start] == '%');
+void mutk::utility::detail::percent_decode_core(std::string &str, size_t start) {
+    assert(str[start] == '%');
 
     auto hex_decode = [](char x) -> int {
          if('0' <= x && x <= '9') {
@@ -44,29 +43,30 @@ void mutk::utility::detail::percent_decode_core(std::string *str, size_t start) 
         return -1;
     };
 
-    auto p = str->begin()+start;
+    auto p = str.begin()+start;
     auto q = p;
     int a, b;
     do {
-        if(++p == str->end()) {
+        if(++p == str.end()) {
             break;
         }
         a = hex_decode(*p);
-        if(++p == str->end()) {
+        if(++p == str.end()) {
             break;
         }
         b = hex_decode(*p);
         if(a != -1 && b != -1) {
             *q++ = a*16+b;
         }
-        for(++p; p!=str->end(); ++p) {
+        for(++p; p!=str.end(); ++p) {
             if(*p == '%') {
                 break;
             }
             *q++ = *p;
         }
-    } while(p != str->end());
-    str->erase(q,str->end());
+    } while(p != str.end());
+    
+    str.erase(q,str.end());
 }
 
 // extracts extension and filename from both file.ext and ext:file.foo

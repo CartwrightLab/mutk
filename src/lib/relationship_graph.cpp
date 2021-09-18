@@ -1341,90 +1341,7 @@ junction_tree::Graph create_junction_tree(
     );
     return ret;
 }
-
-mutk::shape_t calc_reshape(mutk::shape_t a, const mutk::shape_t& b) {
-    std::transform(a.begin(), a.end(), b.begin(), a.begin(), [&](auto x, auto y) {
-        return (y == 0) ? 1 : x;
-    });
-    return a;
-}
-
 } // anon namespace 
-
-// Forward Algorithm:
-void mutk::GeneralPeelingVertex::Forward(PeelingVertex::workspace_t &work) const {
-    // copy local data to local buffer
-    temporary_ = work.stack[local_data_.index];
-    for(int i=0;i<input_data_.size(); ++i) {
-        auto dims = calc_reshape(temporary_.shape(), input_data_[i].shape);
-        temporary_ *= xt::reshape_view(work.stack[input_data_[i].index], dims);
-    }
-    work.stack[output_data_.index] = xt::sum(temporary_, output_data_.shape);
-}
-
-// LCOV_EXCL_START
-TEST_CASE("GeneralPeelingVertex-Forward") {
-    using tensor_t = mutk::tensor_t;
-    mutk::RelationshipGraph::workspace_t work;
-    work.scale = 0.0;
-    work.stack.resize(10);
-
-    SUBCASE("1 Dimensional Vertex") {
-        // Local
-        work.stack[0] = tensor_t({3}, 1.0);
-        // Input
-        work.stack[1] = tensor_t({3}, 0.5);
-        // Output
-        work.stack[2].resize(0);
-
-        tensor_t expected = work.stack[0] * work.stack[1];
-
-        mutk::GeneralPeelingVertex v({0});
-        v.AddLocal({0}, 0);
-        v.AddInput({0}, 1);
-        v.AddOutput({0},2);
-        v.Forward(work);
-
-        REQUIRE(work.stack[2].size() == 3);
-        for(int k=0; k < work.stack[2].size(); ++k) {
-            CAPTURE(k);
-            CHECK(work.stack[2][k] == expected[k]);            
-        }
-    }
-    SUBCASE("2 Dimensional Vertex") {
-        // Local
-        work.stack[0] = {{0.8,0.2,0.3},
-                         {0.1,0.6,0.3},
-                         {0.1,0.2,0.4}};
-        // Input
-        work.stack[1] = {0.0,0.1,0.9};
-        // Output
-        work.stack[2].resize(0);
-
-        // Expected output
-        tensor_t expected = xt::linalg::dot(work.stack[0], work.stack[1]);
-        // expected.resize(3);
-        // for(int a=0;a<3;++a) {
-        //     expected(a) = 0.0;
-        //     for(int b=0;b<3;++b) {
-        //         expected(a) += work.stack[0](a,b)*work.stack[1](b);
-        //     }
-        // }
-
-        mutk::GeneralPeelingVertex v({0,1});
-        v.AddLocal({0,1}, 0);
-        v.AddInput({0},  1);
-        v.AddOutput({1}, 2);
-        v.Forward(work);
-
-        REQUIRE(work.stack[2].size() == 3);
-        for(int k=0; k < work.stack[2].size(); ++k) {
-            CAPTURE(k);
-            CHECK(work.stack[2](k) == expected(k));            
-        }
-    }
-}
-// LCOV_EXCL_STOP
 
 
 mutk::GeneralPeelingVertex::data_t
@@ -1433,7 +1350,7 @@ mutk::GeneralPeelingVertex::MakeMetadata(const std::vector<PeelingVertex::label_
     data_t ret;
     ret.index = buffer_index;
     // fill with zeros.
-    ret.shape.assign(labels.size(), 0);
+    ret.shape.assign(labels_.size(), 0);
 
     // Go through the labels for this vertex and see if they are in the Metadata labels
     // ret.shape[i] is 1 if the label of axis i is in the labels of this vertex
@@ -1446,6 +1363,35 @@ mutk::GeneralPeelingVertex::MakeMetadata(const std::vector<PeelingVertex::label_
     }
     return ret;
 }
+
+// LCOV_EXCL_START
+namespace {
+class Test_MakeMetadata : public mutk::GeneralPeelingVertex {
+    using mutk::GeneralPeelingVertex::GeneralPeelingVertex;
+TEST_CASE_CLASS("GeneralPeelingVertex-MakeMetadata") {
+    Test_MakeMetadata v({1,0});
+
+    using shape_t = mutk::shape_t;
+
+    auto d = v.MakeMetadata({0}, 0);
+    CHECK(d.index == 0);
+    CHECK(d.shape == shape_t{0,1});
+
+    v.AddLocal({1,0}, 0);
+    v.AddInput({0},  1);
+    v.AddOutput({1}, 2);
+
+    CHECK(v.local_data_.index == 0);
+    CHECK(v.local_data_.shape == shape_t{1,1});
+
+    CHECK(v.input_data_.size() == 1);
+    CHECK(v.input_data_[0].index == 1);
+    CHECK(v.input_data_[0].shape == shape_t{0,1});
+
+    CHECK(v.output_data_.index == 2);
+    CHECK(v.output_data_.shape == shape_t{1});
+}};}
+// LCOV_EXCL_STOP
 
 void mutk::GeneralPeelingVertex::AddLocal(const std::vector<PeelingVertex::label_t> &labels,
         std::size_t buffer_index) {
@@ -1472,3 +1418,81 @@ void mutk::GeneralPeelingVertex::AddInput(const std::vector<PeelingVertex::label
         std::size_t buffer_index) {
     input_data_.push_back(MakeMetadata(labels, buffer_index));
 }
+
+namespace {
+    mutk::shape_t calc_reshape(mutk::shape_t a, const mutk::shape_t& b) {
+    std::transform(a.begin(), a.end(), b.begin(), a.begin(), [&](auto x, auto y) {
+        return (y == 0) ? 1 : x;
+    });
+    return a;
+}
+} // anon namespace
+
+// Forward Algorithm:
+void mutk::GeneralPeelingVertex::Forward(PeelingVertex::workspace_t &work) const {
+    // copy local data to local buffer
+    temporary_ = work.stack[local_data_.index];
+    for(int i=0;i<input_data_.size(); ++i) {
+        auto dims = calc_reshape(temporary_.shape(), input_data_[i].shape);
+        temporary_ *= xt::reshape_view(work.stack[input_data_[i].index], dims);
+    }
+    work.stack[output_data_.index] = xt::sum(temporary_, output_data_.shape);
+}
+
+// LCOV_EXCL_START
+TEST_CASE("GeneralPeelingVertex-Forward") {
+    using tensor_t = mutk::tensor_t;
+    mutk::RelationshipGraph::workspace_t work;
+    work.scale = 0.0;
+    work.stack.resize(10);
+
+    SUBCASE("1 Dimensional Vertex") {
+        // Local
+        work.stack[0] = tensor_t({3}, 1.0);
+        // Input
+        work.stack[1] = tensor_t({3}, 0.5);
+        // Output
+        work.stack[2].resize({});
+
+        tensor_t expected = work.stack[0] * work.stack[1];
+
+        mutk::GeneralPeelingVertex v({0});
+        v.AddLocal({0}, 0);
+        v.AddInput({0}, 1);
+        v.AddOutput({0},2);
+        v.Forward(work);
+
+        REQUIRE(work.stack[2].size() == 3);
+        for(int k=0; k < work.stack[2].size(); ++k) {
+            CAPTURE(k);
+            CHECK(work.stack[2][k] == expected[k]);            
+        }
+    }
+    SUBCASE("2 Dimensional Vertex") {
+        // Local
+        work.stack[0] = {{0.8,0.2,0.3},
+                         {0.1,0.6,0.3},
+                         {0.1,0.2,0.4}};
+        // Input
+        work.stack[1] = {0.0,0.1,0.9};
+        // Output
+        work.stack[2].resize({});
+
+        // Expected output
+        tensor_t expected = xt::linalg::dot(work.stack[0], work.stack[1]);
+        // expected = 0.29,0.33,0.38
+
+        mutk::GeneralPeelingVertex v({0,1});
+        v.AddLocal({0,1}, 0);
+        v.AddInput({1},  1);
+        v.AddOutput({0}, 2);
+        v.Forward(work);
+
+        REQUIRE(work.stack[2].size() == 3);
+        for(int k=0; k < work.stack[2].size(); ++k) {
+            CAPTURE(k);
+            CHECK(work.stack[2](k) == expected(k));            
+        }
+    }
+}
+// LCOV_EXCL_STOP

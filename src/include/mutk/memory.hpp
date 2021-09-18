@@ -33,27 +33,36 @@
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xarray.hpp>
 #include <xtensor/xio.hpp>
+#include <xtensor/xgenerator.hpp>
 
 namespace mutk {
 
 using float_t = float;
 using tensor_t = xt::xarray<float_t>;
 using shape_t = tensor_t::shape_type;
+using strides_t = tensor_t::strides_type;
 
-// using tensor_index_t = Eigen::DenseIndex;
+inline
+constexpr tensor_t::size_type num_diploids(tensor_t::size_type n) {
+    return n*(n+1)/2;
+}
 
-// inline
-// constexpr tensor_index_t num_diploids(tensor_index_t n) {
-//     return n*(n+1)/2;
-// }
+template<int N>
+constexpr tensor_t::size_type dim_width(tensor_t::size_type n) {
+    static_assert(N == 1 || N == 2);
+    if constexpr(N == 1) {
+        return n;
+    } else {
+        return num_diploids(n);
+    }
+}
 
-// template<int N>
-// constexpr tensor_index_t dim_width(tensor_index_t n) {
-//     static_assert(N == 1 || N == 2);
-//     if constexpr(N == 1) {
-//         return n;
-//     } else {
-//         return num_diploids(n);
+// namespace detail {
+//     // helper function copied from detail namespace of xtensor library
+//     template <class Functor, class S>
+//     inline auto make_xgenerator(Functor&& f, S&& shape) noexcept {
+//         using type = xt::xgenerator<Functor, std::invoke_result_t<Functor, S>, std::decay_t<S>>;
+//         return type(std::forward<Functor>(f), std::forward<S>(shape));
 //     }
 // }
 
@@ -109,5 +118,23 @@ using shape_t = tensor_t::shape_type;
 // }
 
 } // namespace mutk
+
+// for debugging purposes
+namespace std {
+inline
+std::ostream& operator<< (std::ostream& os, const mutk::shape_t& value) {
+    os << "{";
+    for(size_t i = 0; i < value.size(); ++i) {
+        if(i > 0) {
+            os << ", ";
+        }
+        os << value[i];
+    }
+    os << "}";
+    return os;
+}
+}
+
+
 
 #endif // MUTK_MEMORY_HPP

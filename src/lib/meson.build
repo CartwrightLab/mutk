@@ -8,7 +8,7 @@ libmutk_sources = files([
   'mutation.cpp'
 ])
 
-libmutk_deps = [boost_dep, doctest_dep, eigen_dep]
+libmutk_deps = [boost_dep, doctest_dep, eigen_dep, xtensor_dep, xblas_dep]
 
 libmutk = static_library('mutk', [libmutk_sources, version_file],
   include_directories : inc,

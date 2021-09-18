@@ -80,16 +80,16 @@ public:
     using tensor_t = mutk::tensor_t;
     using potential_t = mutk::detail::potential_t;
 
-    virtual tensor_t CreateMatrix(int n, float t, any_t) const = 0;
-    virtual tensor_t CreateMatrix(int n, float t, mean_t) const = 0;
-    virtual tensor_t CreateMatrix(int n, float t, int x) const = 0;
+    virtual tensor_t CreateMatrix(size_t n, float t, any_t) const = 0;
+    virtual tensor_t CreateMatrix(size_t n, float t, mean_t) const = 0;
+    virtual tensor_t CreateMatrix(size_t n, float t, size_t x) const = 0;
 
-    virtual tensor_t CreatePriorDiploid(int n) const = 0;
-    virtual tensor_t CreatePriorHaploid(int n) const = 0;
+    virtual tensor_t CreatePriorDiploid(size_t n) const = 0;
+    virtual tensor_t CreatePriorHaploid(size_t n) const = 0;
 
-    tensor_t CreatePotential(int n, const potential_t &potential, any_t);
-    tensor_t CreatePotential(int n, const potential_t &potential, mean_t);
-    tensor_t CreatePotential(int n, const potential_t &potential, int x);
+    tensor_t CreatePotential(size_t n, const potential_t &potential, any_t);
+    tensor_t CreatePotential(size_t n, const potential_t &potential, mean_t);
+    tensor_t CreatePotential(size_t n, const potential_t &potential, size_t x);
 
     virtual ~Model() = default;
 };
@@ -121,12 +121,12 @@ public:
         }
     }
 
-    virtual tensor_t CreateMatrix(int n, float t, any_t) const override;
-    virtual tensor_t CreateMatrix(int n, float t, mean_t) const override;
-    virtual tensor_t CreateMatrix(int n, float t, int x) const override;
+    virtual tensor_t CreateMatrix(size_t n, float t, any_t) const override;
+    virtual tensor_t CreateMatrix(size_t n, float t, mean_t) const override;
+    virtual tensor_t CreateMatrix(size_t n, float t, size_t x) const override;
 
-    virtual tensor_t CreatePriorDiploid(int n) const override;
-    virtual tensor_t CreatePriorHaploid(int n) const override;
+    virtual tensor_t CreatePriorDiploid(size_t n) const override;
+    virtual tensor_t CreatePriorHaploid(size_t n) const override;
 
 protected:
     double k_;

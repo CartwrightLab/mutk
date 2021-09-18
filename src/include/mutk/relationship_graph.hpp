@@ -186,8 +186,6 @@ protected:
     std::vector<data_t> input_data_;
 };
 
-}
-
-}; // namespace mutk
+} // namespace mutk
 
 #endif // MUTK_RELATIONSHIP_GRAPH_HPP

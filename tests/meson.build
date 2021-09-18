@@ -1,6 +1,6 @@
 doctest_exe = executable('libmutk-doctest', ['libmutk-doctest.cpp', version_file, libmutk_sources],
   include_directories : inc,
-  dependencies : [doctest_dep, eigen_dep, cli_dep, htslib_dep, minionrng_dep],
+  dependencies : [doctest_dep, eigen_dep, cli_dep, htslib_dep, minionrng_dep, xtensor_dep, xblas_dep, cblas_dep],
   build_by_default : false
 )
 

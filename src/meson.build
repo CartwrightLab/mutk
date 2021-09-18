@@ -14,9 +14,12 @@ version_file = vcs_tag( input : version_src, output : 'version.h' )
 
 inc = include_directories(['.','include'])
 
-boost_dep = dependency('boost', modules : [])
-eigen_dep = dependency('eigen3')
-htslib_dep = dependency('htslib')
+boost_dep   = dependency('boost', modules : [])
+eigen_dep   = dependency('eigen3')
+htslib_dep  = dependency('htslib')
+xtensor_dep = dependency('xtensor')
+xblas_dep   = dependency('xtensor-blas')
+cblas_dep   = dependency('cblas')
 
 subdir('include')
 subdir('lib')
