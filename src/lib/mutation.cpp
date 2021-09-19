@@ -37,7 +37,7 @@ struct kalleles_test_mat {
 
     mat_t Q;
 
-    kalleles_test_mat(int n, float k) : Q(n+1,n+1) {
+    kalleles_test_mat(size_t n, float k) : Q(n+1,n+1) {
         using namespace boost::numeric::ublas;
         // Build matrix
         vector<float> freqs(n+1, 1.0/k);
@@ -70,13 +70,6 @@ void run_mutation_tests(F test) {
     test(4, 1e-6, 6.0);
     test(4, 1e-3, 7.0);
 }
-
-template<typename V>
-inline int shuffle_pos(int i, const V & v) {
-    auto it = std::find(std::begin(v), std::end(v), i);
-    return std::distance(std::begin(v), it);
-}
-
 } // anon namespace
 
 namespace {
@@ -129,7 +122,7 @@ KAllelesModel::tensor_t KAllelesModel::CreateMatrix(size_t n, float t, any_t) co
 TEST_CASE("KAllelesModel-CreateMatrix with any_t") {
     using namespace boost::numeric::ublas;
     
-    auto test = [&](int n, float u, float k) {
+    auto test = [&](size_t n, float u, float k) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
@@ -198,7 +191,7 @@ KAllelesModel::tensor_t KAllelesModel::CreateMatrix(size_t n, float t, size_t x)
 TEST_CASE("KAllelesModel-CreateMatrix with int") {
     using namespace boost::numeric::ublas;
     
-    auto test = [&](int n, float u, float k) {
+    auto test = [&](size_t n, float u, float k) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
@@ -269,7 +262,7 @@ KAllelesModel::tensor_t KAllelesModel::CreateMatrix(size_t n, float t, mean_t) c
 TEST_CASE("KAllelesModel-CreateMatrix with mean_t") {
     using namespace boost::numeric::ublas;
     
-    auto test = [&](int n, float u, float k) {
+    auto test = [&](size_t n, float u, float k) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
@@ -335,7 +328,7 @@ KAllelesModel::tensor_t KAllelesModel::CreatePriorHaploid(size_t n) const {
 
 // LCOV_EXCL_START
 TEST_CASE("KAllelesModel-CreatePriorHaploid") {
-    auto test_haploid = [](int n, float theta, float hap_bias,
+    auto test_haploid = [](size_t n, float theta, float hap_bias,
         float k) {
         CAPTURE(n);
         CAPTURE(theta);
@@ -410,7 +403,7 @@ KAllelesModel::tensor_t KAllelesModel::CreatePriorDiploid(size_t n) const {
 
 // LCOV_EXCL_START
 TEST_CASE("KAllelesModel-CreatePriorDiploid") {
-    auto test_diploid = [](int n, float theta, float hom_bias,
+    auto test_diploid = [](size_t n, float theta, float hom_bias,
         float het_bias, float k) {
         CAPTURE(n);
         CAPTURE(theta);
@@ -471,14 +464,14 @@ TEST_CASE("KAllelesModel-CreatePriorDiploid") {
 
 template<typename Arg>
 mutk::tensor_t create_transition_clone_haploid_impl(const mutk::mutation::Model &model,
-    int n, float t, Arg arg) {
+    size_t n, float t, Arg arg) {
 
     return model.CreateMatrix(n, t, arg);
 }
 
 template<typename Arg>
 mutk::tensor_t create_transition_gamete_diploid_impl(const mutk::mutation::Model &model, 
-    int n, float t, Arg arg) {
+    size_t n, float t, Arg arg) {
 
     using tensor_t = mutk::tensor_t;
 
@@ -608,7 +601,7 @@ struct generate_transition_diploid {
 
 template<typename Tag, typename Arg>
 auto create_transition_diploid_impl(const mutk::mutation::Model &model, 
-    int n, float t1, float t2, Arg arg) {
+    size_t n, float t1, float t2, Arg arg) {
     generate_transition_diploid<Tag> gen;
 
     if constexpr(std::is_same_v<Arg, mutk::mutation::any_t>) {
@@ -633,53 +626,54 @@ auto create_transition_diploid_impl(const mutk::mutation::Model &model,
 template<int N, int M, typename Arg>
 inline
 mutk::tensor_t create_transition_child(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 2);
-    assert(potential.shuffle.size() == 3);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
-    return create_transition_diploid_impl<child_diploid_tag<N,M>>(model, n, potential.parents[0].second,
+    assert(potential.axes.size() == 3);
+    auto ret = create_transition_diploid_impl<child_diploid_tag<N,M>>(model, n, potential.parents[0].second,
         potential.parents[1].second, arg);
+    return xt::transpose(ret, potential.axes);
 }
 
 template<int N, typename Arg>
 inline
 mutk::tensor_t create_transition_child_selfing(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 1);
-    assert(potential.shuffle.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
-    return create_transition_diploid_impl<child_selfing_tag<N>>(model, n, potential.parents[0].second,
+    assert(potential.axes.size() == 2);
+    auto ret = create_transition_diploid_impl<child_selfing_tag<N>>(model, n, potential.parents[0].second,
         potential.parents[0].second, arg);
+    return xt::transpose(ret, potential.axes);
 }
 
 template<typename Arg>
 mutk::tensor_t create_transition_clone_diploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 1);
-    assert(potential.shuffle.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
-    return create_transition_diploid_impl<clone_diploid_tag>(model, n, potential.parents[0].second,
+    assert(potential.axes.size() == 2);
+    auto ret = create_transition_diploid_impl<clone_diploid_tag>(model, n, potential.parents[0].second,
         potential.parents[0].second, arg);
+    return xt::transpose(ret, potential.axes);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_clone_diploid") {
     SUBCASE("Passing mutk::mutation::ANY as argument.") {
-        auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+        auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
             CAPTURE(n);
             CAPTURE(k);
             CAPTURE(u);
 
             potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
-            pot.shuffle = shuf;
+            pot.axes = axes;
             KAllelesModel model{k, 0.001, 0, 0, 0};
             auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::ANY);
 
             auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
 
             REQUIRE(obs.dimension() == 2);
-            REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-            REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+            mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
+            REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+            REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
             for(int a1=0,a=0;a1<n;++a1) {
                 for(int a2=0;a2<=a1;++a2,++a) {
                     for(int b1=0,b=0;b1<n;++b1) {
@@ -696,35 +690,35 @@ TEST_CASE("create_transition_clone_diploid") {
                                 expected += mat(a2,b1)*mat(a1,b2);
                             }
                             std::array<int, 2> indexes = {a,b};
-                            int o1 = indexes[pot.shuffle[0]];
-                            int o2 = indexes[pot.shuffle[1]];
+                            int o1 = indexes[pot.axes[0]];
+                            int o2 = indexes[pot.axes[1]];
                             CHECK(obs(o1,o2) == doctest::Approx(expected));
                         }
                     }
                 }
             }
         };
-        SUBCASE("Shuffle order is {0, 1}.") {
-            auto subtest = [&](int n, float u, float k) {
+        SUBCASE("Axes are {0, 1}.") {
+            auto subtest = [&](size_t n, float u, float k) {
                 return test(n, u, k, {0,1});
             };
             run_mutation_tests(subtest);
         }
-        // SUBCASE("Shuffle order is {1, 0}.") {
-        //     auto subtest = [&](int n, float u, float k) {
-        //         return test(n, u, k, {1,0});
-        //     };
-        //     run_mutation_tests(subtest);
-        // }
+        SUBCASE("Axes are {1, 0}.") {
+            auto subtest = [&](size_t n, float u, float k) {
+                return test(n, u, k, {1,0});
+            };
+            run_mutation_tests(subtest);
+        }
     }
     SUBCASE("Passing mutk::mutation::MEAN as argument.") {
-        auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+        auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
             CAPTURE(n);
             CAPTURE(k);
             CAPTURE(u);
 
             potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
-            pot.shuffle = shuf;
+            pot.axes = axes;
             KAllelesModel model{k, 0.001, 0, 0, 0};
             auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::MEAN);
 
@@ -732,8 +726,9 @@ TEST_CASE("create_transition_clone_diploid") {
             auto mat2 = model.CreateMatrix(n, u, mutk::mutation::ANY);
 
             REQUIRE(obs.dimension() == 2);
-            REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-            REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+            mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
+            REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+            REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
             for(int a1=0,a=0;a1<n;++a1) {
                 for(int a2=0;a2<=a1;++a2,++a) {
                     for(int b1=0,b=0;b1<n;++b1) {
@@ -750,41 +745,42 @@ TEST_CASE("create_transition_clone_diploid") {
                                 expected += mat1(a2,b1)*mat2(a1,b2) + mat2(a2,b1)*mat1(a1,b2);
                             }
                             std::array<int, 2> indexes = {a,b};
-                            int o1 = indexes[pot.shuffle[0]];
-                            int o2 = indexes[pot.shuffle[1]];
+                            int o1 = indexes[pot.axes[0]];
+                            int o2 = indexes[pot.axes[1]];
                             CHECK(obs(o1,o2) == doctest::Approx(expected));
                         }
                     }
                 }
             }
         };
-        SUBCASE("Shuffle order is {0, 1}.") {
-            auto subtest = [&](int n, float u, float k) {
+        SUBCASE("Axes are {0, 1}.") {
+            auto subtest = [&](size_t n, float u, float k) {
                 return test(n, u, k, {0,1});
             };
             run_mutation_tests(subtest);
         }
-        // SUBCASE("Shuffle order is {1, 0}.") {
-        //     auto subtest = [&](int n, float u, float k) {
-        //         return test(n, u, k, {1,0});
-        //     };
-        //     run_mutation_tests(subtest);
-        // }
+        SUBCASE("Axes are {1, 0}.") {
+            auto subtest = [&](size_t n, float u, float k) {
+                return test(n, u, k, {1,0});
+            };
+            run_mutation_tests(subtest);
+        }
     }
     SUBCASE("Passing an integer as argument.") {
-        auto test = [&](int n, float u, float k, std::vector<int> shuf, int val) {
+        auto test = [&](size_t n, float u, float k, std::vector<int> axes, int val) {
             CAPTURE(n);
             CAPTURE(k);
             CAPTURE(u);
 
             potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
-            pot.shuffle = shuf;
+            pot.axes = axes;
             KAllelesModel model{k, 0.001, 0, 0, 0};
             auto obs = create_transition_clone_diploid(model, n, pot, val);
 
             REQUIRE(obs.dimension() == 2);
-            REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-            REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+            mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
+            REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+            REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
             for(int a1=0,a=0;a1<n;++a1) {
                 for(int a2=0;a2<=a1;++a2,++a) {
                     for(int b1=0,b=0;b1<n;++b1) {
@@ -806,56 +802,56 @@ TEST_CASE("create_transition_clone_diploid") {
                                 }
                             }
                             std::array<int, 2> indexes = {a,b};
-                            int o1 = indexes[pot.shuffle[0]];
-                            int o2 = indexes[pot.shuffle[1]];
+                            int o1 = indexes[pot.axes[0]];
+                            int o2 = indexes[pot.axes[1]];
                             CHECK(obs(o1,o2) == doctest::Approx(expected));
                         }
                     }
                 }
             }
         };
-        SUBCASE("Shuffle order is {0, 1}. Integer is 0.") {
-            auto subtest = [&](int n, float u, float k) {
+        SUBCASE("Axes are {0, 1}. Integer is 0.") {
+            auto subtest = [&](size_t n, float u, float k) {
                 return test(n, u, k, {0,1}, 0);
             };
             run_mutation_tests(subtest);
         }
-        // SUBCASE("Shuffle order is {1, 0}. Integer is 1.") {
-        //     auto subtest = [&](int n, float u, float k) {
-        //         return test(n, u, k, {1,0}, 1);
-        //     };
-        //     run_mutation_tests(subtest);
-        // }
+        SUBCASE("Axes are {1, 0}. Integer is 1.") {
+            auto subtest = [&](size_t n, float u, float k) {
+                return test(n, u, k, {1,0}, 1);
+            };
+            run_mutation_tests(subtest);
+        }
     }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_clone_haploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 1);
-    assert(potential.shuffle.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
-    return create_transition_haploid_impl<1>(model, n, potential.parents[0].second, arg);
+    assert(potential.axes.size() == 2);
+    auto ret =  create_transition_haploid_impl<1>(model, n, potential.parents[0].second, arg);
+    return xt::transpose(ret, potential.axes);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_clone_haploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential::CloneHaploid, 0, 1, u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model{k, 0.001, 0, 0, 0};
         auto obs = create_transition_clone_haploid(model, n, pot, mutk::mutation::ANY);
 
         auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
         REQUIRE(obs.dimension() == 2);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n);
-
+        mutk::shape_t pot_shape = {n,n};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
         for(int a=0;a<n;++a) {
             for(int b=0;b<n;++b) {
                 CAPTURE(a);
@@ -863,51 +859,52 @@ TEST_CASE("create_transition_clone_haploid") {
                 // b -> a
                 float expected = mat(a,b);
                 std::array<int, 2> indexes = {a,b};
-                int o1 = indexes[pot.shuffle[0]];
-                int o2 = indexes[pot.shuffle[1]];
+                int o1 = indexes[pot.axes[0]];
+                int o2 = indexes[pot.axes[1]];
                 CHECK(obs(o1,o2) == doctest::Approx(expected));
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0,1});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1,0});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1,0});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_gamete_diploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 1);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
-    return create_transition_haploid_impl<2>(model, n, potential.parents[0].second, arg);
+    auto ret = create_transition_haploid_impl<2>(model, n, potential.parents[0].second, arg);
+    return xt::transpose(ret, potential.axes);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_gamete_diploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential::GameteDiploid, 0, 1, u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_gamete_diploid(model, n, pot, mutk::mutation::ANY);
         auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
         REQUIRE(obs.dimension() == 2);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);        
+        mutk::shape_t pot_shape = {n, n*(n+1)/2};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
         for(int a=0;a<n;++a) {
             for(int b1=0,b=0;b1<n;++b1) {
                 for(int b2=0;b2<=b1;++b2,++b) {
@@ -918,45 +915,45 @@ TEST_CASE("create_transition_gamete_diploid") {
                     // b1/b2 -> a
                     float expected = 0.5*mat(a,b1) + 0.5*mat(a,b2);
                     std::array<int, 2> indexes = {a,b};
-                    int o1 = indexes[pot.shuffle[0]];
-                    int o2 = indexes[pot.shuffle[1]];
+                    int o1 = indexes[pot.axes[0]];
+                    int o2 = indexes[pot.axes[1]];
                     CHECK(obs(o1,o2) == doctest::Approx(expected));
                 }
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0,1});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1,0});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1,0});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_diploid_diploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    // don't shuffle here because the subfunction does it for us.
     return create_transition_child<2, 2>(model, n, potential, arg);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_child_diploid_diploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential:: ChildDiploidDiploid, 0, 1, u, 2, 1.1f*u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_child_diploid_diploid(model, n, pot, mutk::mutation::ANY);
@@ -964,9 +961,10 @@ TEST_CASE("create_transition_child_diploid_diploid") {
         auto mat2 = model.CreateMatrix(n, 1.1f*u, mutk::mutation::ANY);
 
         REQUIRE(obs.dimension() == 3);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(2,pot.shuffle)) == n*(n+1)/2);
+        mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2, n*(n+1)/2};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
+        REQUIRE(obs.shape(2) == pot_shape[pot.axes[2]]);
         for(int a1=0,a=0;a1<n;++a1) {
             for(int a2=0;a2<=a1;++a2,++a) {
                 for(int b1=0,b=0;b1<n;++b1) {
@@ -993,9 +991,9 @@ TEST_CASE("create_transition_child_diploid_diploid") {
                                 }
 
                                 std::array<int, 3> indexes = {a,b,c};
-                                int o1 = indexes[pot.shuffle[0]];
-                                int o2 = indexes[pot.shuffle[1]];
-                                int o3 = indexes[pot.shuffle[2]];
+                                int o1 = indexes[pot.axes[0]];
+                                int o2 = indexes[pot.axes[1]];
+                                int o3 = indexes[pot.axes[2]];
                                 CHECK(obs(o1,o2,o3) == doctest::Approx(expected));
                             }
                         }
@@ -1004,38 +1002,38 @@ TEST_CASE("create_transition_child_diploid_diploid") {
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1, 2}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0, 1, 2});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0, 2}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1, 0, 2});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1, 0, 2});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_haploid_diploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    // no transpose here
     return create_transition_child<1, 2>(model, n, potential, arg);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_child_haploid_diploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential:: ChildHaploidDiploid, 0, 1, u, 2, 1.1f*u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_child_haploid_diploid(model, n, pot, mutk::mutation::ANY);
@@ -1043,9 +1041,10 @@ TEST_CASE("create_transition_child_haploid_diploid") {
         auto mat2 = model.CreateMatrix(n, 1.1f*u, mutk::mutation::ANY);
 
         REQUIRE(obs.dimension() == 3);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n);
-        REQUIRE(obs.shape(shuffle_pos(2,pot.shuffle)) == n*(n+1)/2);
+        mutk::shape_t pot_shape = {n*(n+1)/2, n, n*(n+1)/2};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
+        REQUIRE(obs.shape(2) == pot_shape[pot.axes[2]]);
         for(int a1=0,a=0;a1<n;++a1) {
             for(int a2=0;a2<=a1;++a2,++a) {
                 for(int b=0;b<n;++b) {
@@ -1069,9 +1068,9 @@ TEST_CASE("create_transition_child_haploid_diploid") {
                             }
 
                             std::array<int, 3> indexes = {a,b,c};
-                            int o1 = indexes[pot.shuffle[0]];
-                            int o2 = indexes[pot.shuffle[1]];
-                            int o3 = indexes[pot.shuffle[2]];
+                            int o1 = indexes[pot.axes[0]];
+                            int o2 = indexes[pot.axes[1]];
+                            int o3 = indexes[pot.axes[2]];
                             CHECK(obs(o1,o2,o3) == doctest::Approx(expected));
                         }
                     }
@@ -1079,38 +1078,38 @@ TEST_CASE("create_transition_child_haploid_diploid") {
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1, 2}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0, 1, 2});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0, 2}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1, 0, 2});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1, 0, 2});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_diploid_haploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    // no transpose here
     return create_transition_child<2, 1>(model, n, potential, arg);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_child_diploid_haploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential:: ChildDiploidHaploid, 0, 1, u, 2, 1.1f*u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_child_diploid_haploid(model, n, pot, mutk::mutation::ANY);
@@ -1118,9 +1117,10 @@ TEST_CASE("create_transition_child_diploid_haploid") {
         auto mat2 = model.CreateMatrix(n, 1.1f*u, mutk::mutation::ANY);
 
         REQUIRE(obs.dimension() == 3);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(2,pot.shuffle)) == n);
+        mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2, n};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
+        REQUIRE(obs.shape(2) == pot_shape[pot.axes[2]]);
         for(int a1=0,a=0;a1<n;++a1) {
             for(int a2=0;a2<=a1;++a2,++a) {
                 for(int b1=0,b=0;b1<n;++b1) {
@@ -1144,9 +1144,9 @@ TEST_CASE("create_transition_child_diploid_haploid") {
                             }
 
                             std::array<int, 3> indexes = {a,b,c};
-                            int o1 = indexes[pot.shuffle[0]];
-                            int o2 = indexes[pot.shuffle[1]];
-                            int o3 = indexes[pot.shuffle[2]];
+                            int o1 = indexes[pot.axes[0]];
+                            int o2 = indexes[pot.axes[1]];
+                            int o3 = indexes[pot.axes[2]];
                             CHECK(obs(o1,o2,o3) == doctest::Approx(expected));
                         }
                     }
@@ -1154,38 +1154,38 @@ TEST_CASE("create_transition_child_diploid_haploid") {
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1, 2}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0, 1, 2});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0, 2}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1, 0, 2});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1, 0, 2});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_haploid_haploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 2);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1],potential.shuffle[2]);
+    // no transpose here
     return create_transition_child<1, 1>(model, n, potential, arg);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_child_haploid_haploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential:: ChildHaploidHaploid, 0, 1, u, 2, 1.1f*u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_child_haploid_haploid(model, n, pot, mutk::mutation::ANY);
@@ -1193,9 +1193,10 @@ TEST_CASE("create_transition_child_haploid_haploid") {
         auto mat2 = model.CreateMatrix(n, 1.1f*u, mutk::mutation::ANY);
 
         REQUIRE(obs.dimension() == 3);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n);
-        REQUIRE(obs.shape(shuffle_pos(2,pot.shuffle)) == n);
+        mutk::shape_t pot_shape = {n*(n+1)/2, n, n};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
+        REQUIRE(obs.shape(2) == pot_shape[pot.axes[2]]);
         for(int a1=0,a=0;a1<n;++a1) {
             for(int a2=0;a2<=a1;++a2,++a) {
                 for(int b=0;b<n;++b) {
@@ -1216,55 +1217,56 @@ TEST_CASE("create_transition_child_haploid_haploid") {
                         }
 
                         std::array<int, 3> indexes = {a,b,c};
-                        int o1 = indexes[pot.shuffle[0]];
-                        int o2 = indexes[pot.shuffle[1]];
-                        int o3 = indexes[pot.shuffle[2]];
+                        int o1 = indexes[pot.axes[0]];
+                        int o2 = indexes[pot.axes[1]];
+                        int o3 = indexes[pot.axes[2]];
                         CHECK(obs(o1,o2,o3) == doctest::Approx(expected));
                     }
                 }
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1, 2}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0, 1, 2});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0, 2}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1, 0, 2});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0, 2}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1, 0, 2});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_selfing_diploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 1);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);    
+    // no transpose here
     return create_transition_child_selfing<2>(model, n, potential, arg);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_child_selfing_diploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential::ChildSelfingDiploid, 0, 1, u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_child_selfing_diploid(model, n, pot, mutk::mutation::ANY);
         auto mat1 = model.CreateMatrix(n, u, mutk::mutation::ANY);
 
         REQUIRE(obs.dimension() == 2);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n*(n+1)/2);
+        mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
         for(int a1=0,a=0;a1<n;++a1) {
             for(int a2=0;a2<=a1;++a2,++a) {
                 for(int b1=0,b=0;b1<n;++b1) {
@@ -1286,54 +1288,55 @@ TEST_CASE("create_transition_child_selfing_diploid") {
                         }
 
                         std::array<int, 2> indexes = {a,b};
-                        int o1 = indexes[pot.shuffle[0]];
-                        int o2 = indexes[pot.shuffle[1]];
+                        int o1 = indexes[pot.axes[0]];
+                        int o2 = indexes[pot.axes[1]];
                         CHECK(obs(o1,o2) == doctest::Approx(expected));
                     }
                 }
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0, 1});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1, 0});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1, 0});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_selfing_haploid(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     assert(potential.parents.size() == 1);
-    //auto shuffle_axes = mutk::tensor_dims(potential.shuffle[0],potential.shuffle[1]);
+    // no transpose here
     return create_transition_child_selfing<1>(model, n, potential, arg);
 }
 
 // LCOV_EXCL_START
 TEST_CASE("create_transition_child_selfing_haploid") {
-    auto test = [&](int n, float u, float k, std::vector<int> shuf) {
+    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
         potential_t pot{mutk::detail::Potential::ChildSelfingHaploid, 0, 1, u};
-        pot.shuffle = shuf;
+        pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
         auto obs = create_transition_child_selfing_haploid(model, n, pot, mutk::mutation::ANY);
         auto mat1 = model.CreateMatrix(n, u, mutk::mutation::ANY);
 
         REQUIRE(obs.dimension() == 2);
-        REQUIRE(obs.shape(shuffle_pos(0,pot.shuffle)) == n*(n+1)/2);
-        REQUIRE(obs.shape(shuffle_pos(1,pot.shuffle)) == n);
+        mutk::shape_t pot_shape = {n*(n+1)/2, n};
+        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
+        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
         for(int a1=0,a=0;a1<n;++a1) {
             for(int a2=0;a2<=a1;++a2,++a) {
                 for(int b=0;b<n;++b) {
@@ -1352,33 +1355,47 @@ TEST_CASE("create_transition_child_selfing_haploid") {
                     }
 
                     std::array<int, 2> indexes = {a,b};
-                    int o1 = indexes[pot.shuffle[0]];
-                    int o2 = indexes[pot.shuffle[1]];
+                    int o1 = indexes[pot.axes[0]];
+                    int o2 = indexes[pot.axes[1]];
                     CHECK(obs(o1,o2) == doctest::Approx(expected));
                 }
             }
         }
     };
-    SUBCASE("Shuffle order is {0, 1}.") {
-        auto subtest = [&](int n, float u, float k) {
+    SUBCASE("Axes are {0, 1}.") {
+        auto subtest = [&](size_t n, float u, float k) {
             return test(n, u, k, {0, 1});
         };
         run_mutation_tests(subtest);
     }
-    // SUBCASE("Shuffle order is {1, 0}.") {
-    //     auto subtest = [&](int n, float u, float k) {
-    //         return test(n, u, k, {1, 0});
-    //     };
-    //     run_mutation_tests(subtest);
-    // }
+    SUBCASE("Axes are {1, 0}.") {
+        auto subtest = [&](size_t n, float u, float k) {
+            return test(n, u, k, {1, 0});
+        };
+        run_mutation_tests(subtest);
+    }
 }
 // LCOV_EXCL_STOP
+
+mutk::tensor_t create_unit_potential(size_t n, const potential_t &potential) {
+    assert(potential.type == mutk::detail::Potential::Unit);
+    mutk::shape_t shape;
+    for(auto &&a : potential.axes) {
+        assert(a == 1 || a == 2);
+        if(a == 1) {
+            shape.push_back(mutk::dim_width<1>(n));
+        } else {
+            shape.push_back(mutk::dim_width<2>(n));
+        }
+    }
+    return xt::ones<mutk::float_t>(shape);
+}
 
 namespace mutk {
 template<typename Arg>
 inline
 mutk::tensor_t create_mutation_potential(const mutk::mutation::Model &model, 
-    int n, const potential_t &potential, Arg arg) {
+    size_t n, const potential_t &potential, Arg arg) {
     using P = mutk::detail::Potential;
 
     switch(potential.type) {
@@ -1401,7 +1418,7 @@ mutk::tensor_t create_mutation_potential(const mutk::mutation::Model &model,
     case P::ChildSelfingHaploid:
         return create_transition_child_selfing_haploid(model, n, potential, arg);
     case P::Unit:
-        return {};
+        return create_unit_potential(n, potential);
     default:
         break;
     };

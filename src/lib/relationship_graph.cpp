@@ -330,37 +330,60 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     }
 
     // sort the labels of each jctnode according to elimination rank
-    // elimination_rand_[id] = at what step `id` is eliminated
+    // elimination_rank_[id] = at what step `id` is eliminated
     elimination_rank_.resize(num_vertices(graph_));
     for(size_t n = 0; n < elim_steps.first.size(); ++n) {
         elimination_rank_[elim_steps.first[n]] = n;
     }
+    
+    auto ploidies = get(boost::vertex_ploidy, graph_);
     using tensor_label_t = std::vector<PeelingVertex::label_t>;
     std::vector<tensor_label_t> tensor_labels(num_vertices(junction_tree_));
     auto jctnode_range = boost::make_iterator_range(vertices(junction_tree_));
+
+    // sort the vertices in jctnode by elimination rank
+    // vertices that are eliminated later go to the front.
+    // use a lambda function for code reuse
+    auto elim_cmp = [](auto a, auto b) -> bool {
+        return a > b;
+    };
+
     for(auto &&v : jctnode_range) {
         // sort the vertices at this jctnode by elimination rank
         const neighbors_t &label = jctnode_labels[v];
         tensor_label_t tensor_lab(label.begin(), label.end());
         boost::range::sort(tensor_lab, [&](auto a, auto b) {
-            return elimination_rank_[a] < elimination_rank_[b];
+            return elim_cmp(elimination_rank_[a], elimination_rank_[b]);
         });
         tensor_labels[v] = tensor_lab;
 
-        // identify the proper shuffle axes.
         auto &pot = potentials_[jctnode_to_potential[v]];
+
         if(pot.type == Potential::Unit) {
-            // skip if unit potential
+            // for unit potentials, use axes to store the node shape as ploidies
+            pot.axes.clear();
+            for(auto && lab : tensor_lab) {
+                pot.axes.push_back(ploidies[lab]);
+            }
             continue;
         }
-        pot.shuffle.resize(tensor_lab.size());
-        auto it = boost::range::find(tensor_lab, pot.child);
-        assert(it != tensor_lab.end());
-        pot.shuffle[std::distance(tensor_lab.begin(), it)] = 0;
-        for(int i = 0; i < pot.parents.size(); ++i) {
-            it = boost::range::find(tensor_lab, pot.parents[i].first);
-            assert(it != tensor_lab.end());
-            pot.shuffle[std::distance(tensor_lab.begin(), it)] = i+1;
+
+        // Transition matrices when created have axes child,parent,parent
+        // identify the proper shuffle axes.
+        std::vector<std::pair<std::size_t,std::size_t>> labeled_axes;
+        labeled_axes.emplace_back(elimination_rank_[pot.child],0);
+        for(size_t i = 0; i < pot.parents.size(); ++i) {
+            labeled_axes.emplace_back(pot.parents[i].first,i+1);
+        }
+        // sort the labeled axes so that labels that are eliminated
+        // later come earlier.
+        boost::range::sort(labeled_axes, [&](auto a, auto b) {
+            return elim_cmp(a.first, b.first);
+        });
+
+        pot.axes.resize(labeled_axes.size());
+        for(size_t i = 0; i < labeled_axes.size(); ++i) {
+            pot.axes[i] = labeled_axes[i].second;
         }
     }
 
@@ -1094,7 +1117,6 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
 
 std::vector<mutk::RelationshipGraph::potential_t>
 create_potentials(const pedigree_graph::Graph &graph) {
-    using vertex_t = pedigree_graph::vertex_t;
     using Potential = mutk::RelationshipGraph::Potential;
 
     auto ploidies = get(boost::vertex_ploidy, graph);

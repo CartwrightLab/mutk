@@ -55,7 +55,7 @@ struct potential_t {
     int child;
     using data_t = std::pair<int,float>;
     boost::container::static_vector<data_t, 2> parents;
-    std::vector<int> shuffle;
+    std::vector<int> axes;
 
     potential_t() = default;
     potential_t(Potential type_arg, int child_arg) : type{type_arg}, child{child_arg} {}
