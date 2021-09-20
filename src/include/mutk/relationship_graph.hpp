@@ -64,6 +64,16 @@ struct workspace_t {
 
 } //namespace detail
 
+struct peeling_op_t {
+    struct data_t {
+        size_t register_id;
+        std::vector<size_t> axes;
+    };
+    data_t local;
+    data_t output;
+    std::vector<data_t> inputs;
+};
+
 
 class PeelingVertex;
 
@@ -99,6 +109,10 @@ public:
         return graph_;
     }
 
+    const auto & peeling_ops() const {
+        return peeling_ops_;
+    }
+
 protected:
     InheritanceModel inheritance_model_{InheritanceModel::Autosomal};
 
@@ -114,7 +128,6 @@ protected:
     size_t stack_size_;
     std::vector<mutk::shape_t> ploidy_shapes_;
     
-
     // The probability potentials of the relationship graph
     std::vector<potential_t> potentials_;
 
@@ -122,6 +135,7 @@ protected:
     std::vector<std::size_t> elimination_rank_;
 
     // Peeling Operations
+    std::vector<peeling_op_t> peeling_ops_;
     using peeling_t = std::unique_ptr<PeelingVertex>;
     std::vector<peeling_t> peelers_;
 

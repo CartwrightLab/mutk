@@ -393,12 +393,17 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     // Record the output messages of every node
     std::vector<size_t> output_index(num_vertices(junction_tree_), -1);
 
+    peeling_ops_.clear();
+
     // iterate the junction tree in reverse order
     auto rev_jctnode_range = boost::adaptors::reverse(jctnode_range);
     for(auto &&v : rev_jctnode_range) {
+        peeling_op_t op;
+        
         peeling_t peeler = std::make_unique<GeneralPeelingVertex>(tensor_labels[v]);
-
         peeler->AddLocal(tensor_labels[v], jctnode_to_potential[v]);
+        op.local.register_id = jctnode_to_potential[v];
+        op.local.axes.assign(tensor_labels[v].begin(), tensor_labels[v].end());
 
         auto adj_range = boost::make_iterator_range(adjacent_vertices(v, junction_tree_));
         for(auto &&w : adj_range) {
@@ -406,18 +411,26 @@ void mutk::RelationshipGraph::ConstructPeeler() {
             if(w < v) {
                 assert(output_index[v] == -1);
                 peeler->AddOutput(tensor_labels[w], counter);
+                op.output.register_id = counter;
+                op.output.axes.assign(tensor_labels[w].begin(), tensor_labels[w].end());
                 output_index[v] = counter++;
             } else {
                 peeler->AddInput(tensor_labels[w], output_index[w]);
+                peeling_op_t::data_t dat;
+                dat.register_id = output_index[w];
+                dat.axes.assign(tensor_labels[w].begin(), tensor_labels[w].end());
+                op.inputs.push_back(dat);
             }
         }
         // we have a root peeler
         if(output_index[v] == -1) {
             peeler->AddOutput({}, counter);
             roots_.push_back(counter);
+            op.output.register_id = counter;
             output_index[v] = counter++;
         }
         peelers_.push_back(std::move(peeler));
+        peeling_ops_.push_back(op);
     }
     stack_size_ = counter;
 }
@@ -580,20 +593,50 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Trio") {
             CHECK_EQ_RANGES(relationship_graph.elimination_rank_, v({4,3,2,1,0}));
             CHECK_EQ_RANGES(relationship_graph.roots_, v({17}));
             
-            auto &peelers = relationship_graph.peelers_;
+            auto &peelers = relationship_graph.peeling_ops_;
+
             REQUIRE(peelers.size() == 9);
-            mutk::GeneralPeelingVertex *peel6 = dynamic_cast<mutk::GeneralPeelingVertex*>(peelers[3].get());
-            CHECK(peel6->local_data().index == 6);
-            CHECK_EQ_RANGES(peel6->local_data().shape, v({1,1,1}));
+            {
+                std::vector<size_t> observed(9);
+                std::transform(peelers.begin(), peelers.end(), observed.begin(), [&](auto & x){
+                    return x.local.register_id;
+                });
+                CHECK_EQ_RANGES(observed, v({2,7,1,6,0,5,4,8,3}));
+            } {
+                std::vector<size_t> observed(9);
+                std::transform(peelers.begin(), peelers.end(), observed.begin(), [&](auto & x){
+                    return x.output.register_id;
+                });
+                CHECK_EQ_RANGES(observed, v({9,10,11,12,13,14,15,16,17}));
+            } {
+                auto input_ids = [&](auto & a) {
+                    std::vector<size_t> observed;
+                    std::transform(a.inputs.begin(), a.inputs.end(),
+                    std::back_inserter(observed), [&](auto & x){
+                        return x.register_id;
+                    });
+                    return observed;
+                };
+                CHECK_EQ_RANGES(input_ids(peelers[0]), v({}));
+                CHECK_EQ_RANGES(input_ids(peelers[1]), v({9}));
+                CHECK_EQ_RANGES(input_ids(peelers[2]), v({}));
+                CHECK_EQ_RANGES(input_ids(peelers[3]), v({11}));
+                CHECK_EQ_RANGES(input_ids(peelers[4]), v({}));
+                CHECK_EQ_RANGES(input_ids(peelers[5]), v({13}));
+                CHECK_EQ_RANGES(input_ids(peelers[6]), v({10}));
+                CHECK_EQ_RANGES(input_ids(peelers[7]), v({15,12}));
+                CHECK_EQ_RANGES(input_ids(peelers[8]), v({16,14}));
+            }
+
         }
         SUBCASE("Verify Results") {
             //auto &potentials = relationship_graph.potentials_;
             auto work = relationship_graph.CreateWorkspace();
             work.scale = 0;
             // Likelihoods
-            work.stack[0] = {1, 0, 0};
-            work.stack[1] = {1, 1e-4, 0};
-            work.stack[2] = {0, 1, 1e-5};
+            work.stack[0] = {1, 0, 0};    // Mom
+            work.stack[1] = {0, 1, 1e-5}; // Child
+            work.stack[2] = {1, 1e-4, 0}; // Dad
             // Founders
             work.stack[3] = {1-1e-4-1e-8, 1e-4, 1e-8};
             work.stack[4] = {1-1e-4-1e-8, 1e-4, 1e-8};
@@ -611,12 +654,6 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Trio") {
             work.stack[8] = xt::ones<float>({3,3});
 
             CHECK(relationship_graph.PeelForward(work) == doctest::Approx(std::log(0.009978069)));
-
-            // KAllelesModel model(k, 0.001, 0, 0, 0);
-            // for(size_t i=0; i < potentials.size(); ++i) {
-            //     work.stack[i] = model.CreatePotential(2, )
-            // }
-
         }
     }
 }
