@@ -1419,6 +1419,10 @@ mutk::tensor_t create_mutation_potential(const mutk::mutation::Model &model,
         return create_transition_child_selfing_haploid(model, n, potential, arg);
     case P::Unit:
         return create_unit_potential(n, potential);
+    case P::FounderDiploid:
+        return model.CreatePriorDiploid(n);
+    case P::FounderHaploid: 
+        return model.CreatePriorHaploid(n);
     default:
         break;
     };

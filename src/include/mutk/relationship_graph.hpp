@@ -173,6 +173,16 @@ public:
 
     virtual void Forward(PeelingVertex::workspace_t &work) const override;
 
+    const auto & local_data() const {
+        return local_data_;
+    }
+    const auto & output_data() const {
+        return output_data_;
+    }
+    const auto & input_data() const {
+        return input_data_;
+    }
+
 protected:
     data_t MakeMetadata(const std::vector<PeelingVertex::label_t> &labels,
         std::size_t buffer_index) const;

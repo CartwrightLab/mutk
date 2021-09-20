@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 */
-#include <doctest/doctest.h>
+#include "unit_testing.hpp"
 
 #include <mutk/relationship_graph.hpp>
 #include <mutk/detail/graph.hpp>
@@ -189,9 +189,7 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructGraph") {
 
         auto graph = relationship_graph.graph();
 
-        auto vertex_range = boost::make_iterator_range(vertices(graph));
-
-        auto labels = get(boost::vertex_label, graph);
+                auto labels = get(boost::vertex_label, graph);
         auto ploidies = get(boost::vertex_ploidy, graph);
         auto types = get(boost::vertex_type, graph);
 
@@ -416,7 +414,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
         // we have a root peeler
         if(output_index[v] == -1) {
             peeler->AddOutput({}, counter);
-            roots_.push_back(v);
+            roots_.push_back(counter);
             output_index[v] = counter++;
         }
         peelers_.push_back(std::move(peeler));
@@ -427,76 +425,199 @@ void mutk::RelationshipGraph::ConstructPeeler() {
 // LCOV_EXCL_START
 namespace {
 class Test_ConstructPeeler : public mutk::RelationshipGraph {
-TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler") {
+TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Single") {
     using Potential = mutk::detail::Potential;
+    const char ped[] = 
+        "##PEDNG v0.1\n"
+        "A\t.\t.\tF\t=\n";
+    std::vector<const char*> known_samples = {"A"};
+
+    Pedigree pedigree;
+    REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
+
     SUBCASE("InheritanceModel::Autosomal") {
-        const char ped[] = 
-            "##PEDNG v0.1\n"
-            "A\t.\t.\tM\t=\n"
-            "B\t.\t.\tF\t=\n"
-            "C\tA\tB\tM\t=\n";
-        std::vector<const char*> known_samples = {"A","B","C"};
-
-        Pedigree pedigree;
-        REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
-
         Test_ConstructPeeler relationship_graph;
         REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
             known_samples, mutk::InheritanceModel::Autosomal,
             1e-6, 1e-6, false));
         REQUIRE_NOTHROW(relationship_graph.ConstructPeeler());
 
+        // Checking Potentials
         auto &potentials = relationship_graph.potentials_;
-
-        REQUIRE(potentials.size() == 3+2+3+1);
-
+        REQUIRE(potentials.size() == 1+1+1);
         CHECK(potentials[0].type == Potential::LikelihoodDiploid);
-        CHECK(potentials[0].child == 2);
+        CHECK(potentials[0].child == 1);
         CHECK(potentials[0].parents.size() == 0);
 
-        CHECK(potentials[1].type == Potential::LikelihoodDiploid);
-        CHECK(potentials[1].child == 3);
+        CHECK(potentials[1].type == Potential::FounderDiploid);
+        CHECK(potentials[1].child == 0);
         CHECK(potentials[1].parents.size() == 0);
 
-        CHECK(potentials[2].type == Potential::LikelihoodDiploid);
-        CHECK(potentials[2].child == 4);
-        CHECK(potentials[2].parents.size() == 0);
+        CHECK(potentials[2].type == Potential::CloneDiploid);
+        CHECK(potentials[2].child == 1);
+        REQUIRE(potentials[2].parents.size() == 1);
+        CHECK(potentials[2].parents[0].first == 0);
+        CHECK(potentials[2].parents[0].second == 1e-6f);
 
-        CHECK(potentials[3].type == Potential::FounderDiploid);
-        CHECK(potentials[3].child == 0);
-        CHECK(potentials[3].parents.size() == 0);
+        // Elimination Rank
+        auto &elimination_rank = relationship_graph.elimination_rank_;
+        REQUIRE(elimination_rank.size() == 2);
+        CHECK(elimination_rank[0] == 1);
+        CHECK(elimination_rank[1] == 0);
 
-        CHECK(potentials[4].type == Potential::FounderDiploid);
-        CHECK(potentials[4].child == 1);
-        CHECK(potentials[4].parents.size() == 0);
+        // Checking Peelers
+        auto &peelers = relationship_graph.peelers_;
+        REQUIRE(peelers.size() == 3);
+        mutk::GeneralPeelingVertex *peel0 = dynamic_cast<mutk::GeneralPeelingVertex*>(peelers[0].get());
+        CHECK(peel0->local_data().index == 0);
+        CHECK(peel0->output_data().index == 3);
+        CHECK(peel0->input_data().empty());
+        mutk::GeneralPeelingVertex *peel1 = dynamic_cast<mutk::GeneralPeelingVertex*>(peelers[1].get());
+        CHECK(peel1->local_data().index == 2);
+        CHECK(peel1->output_data().index == 4);
+        REQUIRE(peel1->input_data().size() == 1);
+        CHECK(peel1->input_data()[0].index == 3);
+        mutk::GeneralPeelingVertex *peel2 = dynamic_cast<mutk::GeneralPeelingVertex*>(peelers[2].get());
+        CHECK(peel2->local_data().index == 1);
+        CHECK(peel2->output_data().index == 5);
+        REQUIRE(peel2->input_data().size() == 1);
+        CHECK(peel2->input_data()[0].index == 4);
 
-        CHECK(potentials[5].type == Potential::CloneDiploid);
-        CHECK(potentials[5].child == 2);
-        REQUIRE(potentials[5].parents.size() == 1);
-        CHECK(potentials[5].parents[0].first == 0);
-        CHECK(potentials[5].parents[0].second == 1e-6f);
+        // Checking Root
+        REQUIRE(relationship_graph.roots_.size() == 1);
+        CHECK(relationship_graph.roots_[0] == 5);
 
-        CHECK(potentials[6].type == Potential::ChildDiploidDiploid);
-        CHECK(potentials[6].child == 3);
-        REQUIRE(potentials[6].parents.size() == 2);
-        CHECK(potentials[6].parents[0].first == 1);
-        CHECK(potentials[6].parents[0].second == 2e-6f);
-        CHECK(potentials[6].parents[1].first == 0);
-        CHECK(potentials[6].parents[1].second == 2e-6f);
+        // Checking Product
+        auto work = relationship_graph.CreateWorkspace();
+        work.scale = 10.0;
+        work.stack[0] = {1, 0.1, 0.001};
+        work.stack[1] = {1-1e-4-1e-8, 1e-4, 1e-8};
+        work.stack[2] = {{0.998001, 0.000999, 1e-06},
+                         {0.001998, 0.998002, 0.001998},
+                         {1e-06, 0.000999, 0.998001}};
 
-        CHECK(potentials[7].type == Potential::CloneDiploid);
-        CHECK(potentials[7].child == 4);
-        REQUIRE(potentials[7].parents.size() == 1);
-        CHECK(potentials[7].parents[0].first == 1);
-        CHECK(potentials[7].parents[0].second == 1e-6f);
+        CHECK(relationship_graph.PeelForward(work) == doctest::Approx(10+std::log(0.9981111)));
+    }
+}
 
-        CHECK(potentials[8].type == Potential::Unit);
-        CHECK(potentials[8].child == -1);
-        REQUIRE(potentials[8].parents.size() == 2);
-        CHECK(potentials[8].parents[0].first == 0);
-        CHECK(potentials[8].parents[0].second == 0.0f);
-        CHECK(potentials[8].parents[1].first == 1);
-        CHECK(potentials[8].parents[1].second == 0.0f);
+TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Trio") {
+    using Potential = mutk::detail::Potential;
+
+    const char ped[] = 
+        "##PEDNG v0.1\n"
+        "A\t.\t.\tM\t=\n"
+        "B\t.\t.\tF\t=\n"
+        "C\tA\tB\tM\t=\n";
+    std::vector<const char*> known_samples = {"A","B","C"};
+
+    Pedigree pedigree;
+    REQUIRE_NOTHROW(pedigree = Pedigree::parse_text(ped));
+
+    SUBCASE("InheritanceModel::Autosomal") {
+        Test_ConstructPeeler relationship_graph;
+        REQUIRE_NOTHROW(relationship_graph.ConstructGraph(pedigree,
+            known_samples, mutk::InheritanceModel::Autosomal,
+            1e-6, 1e-6, false));
+        REQUIRE_NOTHROW(relationship_graph.ConstructPeeler());
+
+        SUBCASE("Verify Potentials") {
+            using v = std::vector<int>;
+            auto &potentials = relationship_graph.potentials_;
+
+            REQUIRE(potentials.size() == 3+2+3+1);
+
+            CHECK(potentials[0].type == Potential::LikelihoodDiploid);
+            CHECK(potentials[0].child == 2);
+            CHECK(potentials[0].parents.size() == 0);
+
+            CHECK(potentials[1].type == Potential::LikelihoodDiploid);
+            CHECK(potentials[1].child == 3);
+            CHECK(potentials[1].parents.size() == 0);
+
+            CHECK(potentials[2].type == Potential::LikelihoodDiploid);
+            CHECK(potentials[2].child == 4);
+            CHECK(potentials[2].parents.size() == 0);
+
+            CHECK(potentials[3].type == Potential::FounderDiploid);
+            CHECK(potentials[3].child == 0);
+            CHECK(potentials[3].parents.size() == 0);
+
+            CHECK(potentials[4].type == Potential::FounderDiploid);
+            CHECK(potentials[4].child == 1);
+            CHECK(potentials[4].parents.size() == 0);
+
+            CHECK(potentials[5].type == Potential::CloneDiploid);
+            CHECK(potentials[5].child == 2);
+            REQUIRE(potentials[5].parents.size() == 1);
+            CHECK(potentials[5].parents[0].first == 0);
+            CHECK(potentials[5].parents[0].second == 1e-6f);
+
+            CHECK(potentials[6].type == Potential::ChildDiploidDiploid);
+            CHECK(potentials[6].child == 3);
+            REQUIRE(potentials[6].parents.size() == 2);
+            CHECK(potentials[6].parents[0].first == 1);
+            CHECK(potentials[6].parents[0].second == 2e-6f);
+            CHECK(potentials[6].parents[1].first == 0);
+            CHECK(potentials[6].parents[1].second == 2e-6f);
+            CHECK_EQ_RANGES(potentials[6].axes, v({0,1,2}));
+
+            CHECK(potentials[7].type == Potential::CloneDiploid);
+            CHECK(potentials[7].child == 4);
+            REQUIRE(potentials[7].parents.size() == 1);
+            CHECK(potentials[7].parents[0].first == 1);
+            CHECK(potentials[7].parents[0].second == 1e-6f);
+
+            CHECK(potentials[8].type == Potential::Unit);
+            CHECK(potentials[8].child == -1);
+            REQUIRE(potentials[8].parents.size() == 2);
+            CHECK(potentials[8].parents[0].first == 0);
+            CHECK(potentials[8].parents[0].second == 0.0f);
+            CHECK(potentials[8].parents[1].first == 1);
+            CHECK(potentials[8].parents[1].second == 0.0f);
+        }
+        SUBCASE("Verify Peelers") {
+            using v = std::vector<int>;
+            CHECK_EQ_RANGES(relationship_graph.elimination_rank_, v({4,3,2,1,0}));
+            CHECK_EQ_RANGES(relationship_graph.roots_, v({17}));
+            
+            auto &peelers = relationship_graph.peelers_;
+            REQUIRE(peelers.size() == 9);
+            mutk::GeneralPeelingVertex *peel6 = dynamic_cast<mutk::GeneralPeelingVertex*>(peelers[3].get());
+            CHECK(peel6->local_data().index == 6);
+            CHECK_EQ_RANGES(peel6->local_data().shape, v({1,1,1}));
+        }
+        SUBCASE("Verify Results") {
+            //auto &potentials = relationship_graph.potentials_;
+            auto work = relationship_graph.CreateWorkspace();
+            work.scale = 0;
+            // Likelihoods
+            work.stack[0] = {1, 0, 0};
+            work.stack[1] = {1, 1e-4, 0};
+            work.stack[2] = {0, 1, 1e-5};
+            // Founders
+            work.stack[3] = {1-1e-4-1e-8, 1e-4, 1e-8};
+            work.stack[4] = {1-1e-4-1e-8, 1e-4, 1e-8};
+            // Transitions
+            work.stack[5] = {{0.998001, 0.000999, 1e-06},
+                             {0.001998, 0.998002, 0.001998},
+                             {1e-06, 0.000999, 0.998001}};
+            mutk::tensor_t temp = {{{0.99, 0.495, 0}, {0.01, 0.5, 0.99}, {0, 0.005, 0.01}},
+                             {{0.5, 0.25, 0}, {0.5, 0.5, 0.5}, {0, 0.25, 0.5}},
+                             {{0.01, 0.005, 0}, {0.99, 0.5, 0.01}, {0, 0.495, 0.99}}};
+            work.stack[6] = xt::transpose(temp, {0,2,1});
+
+            work.stack[7] = {{1, 0, 0},{0, 1, 0},{0, 0, 1}};
+            // Unit potential
+            work.stack[8] = xt::ones<float>({3,3});
+
+            CHECK(relationship_graph.PeelForward(work) == doctest::Approx(std::log(0.009978069)));
+
+            // KAllelesModel model(k, 0.001, 0, 0, 0);
+            // for(size_t i=0; i < potentials.size(); ++i) {
+            //     work.stack[i] = model.CreatePotential(2, )
+            // }
+
+        }
     }
 }
 };
