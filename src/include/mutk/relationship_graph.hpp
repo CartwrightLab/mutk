@@ -43,6 +43,8 @@
 
 namespace mutk {
 
+class PeelingVertex;
+
 enum struct InheritanceModel {
     Autosomal,    // default option
     Maternal,     // transmitted by mother to child
@@ -62,8 +64,6 @@ struct workspace_t {
     float_t scale;
 };
 
-} //namespace detail
-
 struct peeling_op_t {
     struct data_t {
         size_t register_id;
@@ -74,8 +74,9 @@ struct peeling_op_t {
     std::vector<data_t> inputs;
 };
 
+} //namespace detail
 
-class PeelingVertex;
+
 
 class RelationshipGraph {
 public:
@@ -83,6 +84,7 @@ public:
     using workspace_t = detail::workspace_t;
     using Potential = detail::Potential;
     using potential_t = detail::potential_t;
+    using peeling_op_t = detail::peeling_op_t;
 
     using graph_t = detail::pedigree_graph::Graph;
     using junction_tree_t = detail::junction_tree::Graph;
@@ -107,10 +109,6 @@ public:
 
     const graph_t & graph() const {
         return graph_;
-    }
-
-    const auto & peeling_ops() const {
-        return peeling_ops_;
     }
 
 protected:

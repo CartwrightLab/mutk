@@ -78,8 +78,6 @@ void prune(pedigree_graph::Graph &graph, InheritanceModel model);
 
 pedigree_graph::Graph finalize(const pedigree_graph::Graph &input);
 
-void peeling_order(const pedigree_graph::Graph &graph);
-
 std::vector<mutk::RelationshipGraph::potential_t>
 create_potentials(const pedigree_graph::Graph &graph);
 
@@ -399,40 +397,50 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     auto rev_jctnode_range = boost::adaptors::reverse(jctnode_range);
     for(auto &&v : rev_jctnode_range) {
         peeling_op_t op;
-        
-        peeling_t peeler = std::make_unique<GeneralPeelingVertex>(tensor_labels[v]);
-        peeler->AddLocal(tensor_labels[v], jctnode_to_potential[v]);
+        // Setup local data
         op.local.register_id = jctnode_to_potential[v];
         op.local.axes.assign(tensor_labels[v].begin(), tensor_labels[v].end());
 
+        // Setup inputs and output connections
         auto adj_range = boost::make_iterator_range(adjacent_vertices(v, junction_tree_));
         for(auto &&w : adj_range) {
             assert(w != v);
             if(w < v) {
                 assert(output_index[v] == -1);
-                peeler->AddOutput(tensor_labels[w], counter);
                 op.output.register_id = counter;
                 op.output.axes.assign(tensor_labels[w].begin(), tensor_labels[w].end());
                 output_index[v] = counter++;
             } else {
-                peeler->AddInput(tensor_labels[w], output_index[w]);
                 peeling_op_t::data_t dat;
                 dat.register_id = output_index[w];
                 dat.axes.assign(tensor_labels[w].begin(), tensor_labels[w].end());
                 op.inputs.push_back(dat);
             }
         }
-        // we have a root peeler
+        // If no output has been found, we have a root peeler
         if(output_index[v] == -1) {
-            peeler->AddOutput({}, counter);
-            roots_.push_back(counter);
             op.output.register_id = counter;
+            op.output.axes.clear();
             output_index[v] = counter++;
         }
-        peelers_.push_back(std::move(peeler));
         peeling_ops_.push_back(op);
     }
     stack_size_ = counter;
+
+    // Construct peelers
+    peelers_.clear();
+    for(const auto &op : peeling_ops_) {
+        peeling_t peeler = std::make_unique<GeneralPeelingVertex>(op.local.axes);
+        peeler->AddLocal(op.local.axes, op.local.register_id);
+        for(const auto & i : op.inputs) {
+            peeler->AddInput(i.axes, i.register_id);
+        }
+        peeler->AddOutput(op.output.axes, op.output.register_id);
+        if(op.output.axes.empty()) {
+            roots_.push_back(op.output.register_id);            
+        }
+        peelers_.push_back(std::move(peeler));
+    }
 }
 
 // LCOV_EXCL_START
@@ -1074,7 +1082,6 @@ void construct_pedigree_graph(pedigree_graph::Graph &graph,
     bool normalize_somatic_trees) {
 
     using namespace std;
-    using Sex = mutk::Pedigree::Sex;
 
     auto get_ploidy = [](const Pedigree::Member &member) -> int {
         using boost::algorithm::iequals;
