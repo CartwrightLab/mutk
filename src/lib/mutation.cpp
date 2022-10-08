@@ -83,7 +83,8 @@ constexpr int ALLELE[][2] = {
 }
 
 using KAllelesModel = mutk::mutation::KAllelesModel;
-using potential_t = mutk::RelationshipGraph::potential_t;
+using potential_t = mutk::potential_t;
+using IndyId = mutk::IndyId;
 
 // LCOV_EXCL_START
 TEST_CASE("KAllelesModel-Constructor") {
@@ -663,7 +664,7 @@ TEST_CASE("create_transition_clone_diploid") {
             CAPTURE(k);
             CAPTURE(u);
 
-            potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
+            potential_t pot{mutk::PotentialType::CloneDiploid, IndyId(0), IndyId(1), u};
             pot.axes = axes;
             KAllelesModel model{k, 0.001, 0, 0, 0};
             auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::ANY);
@@ -717,7 +718,7 @@ TEST_CASE("create_transition_clone_diploid") {
             CAPTURE(k);
             CAPTURE(u);
 
-            potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
+            potential_t pot{mutk::PotentialType::CloneDiploid, IndyId(0), IndyId(1), u};
             pot.axes = axes;
             KAllelesModel model{k, 0.001, 0, 0, 0};
             auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::MEAN);
@@ -772,7 +773,7 @@ TEST_CASE("create_transition_clone_diploid") {
             CAPTURE(k);
             CAPTURE(u);
 
-            potential_t pot{mutk::detail::Potential::CloneDiploid, 0, 1, u};
+            potential_t pot{mutk::PotentialType::CloneDiploid, IndyId(0), IndyId(1), u};
             pot.axes = axes;
             KAllelesModel model{k, 0.001, 0, 0, 0};
             auto obs = create_transition_clone_diploid(model, n, pot, val);
@@ -842,7 +843,7 @@ TEST_CASE("create_transition_clone_haploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential::CloneHaploid, 0, 1, u};
+        potential_t pot{mutk::PotentialType::CloneHaploid, IndyId(0), IndyId(1), u};
         pot.axes = axes;
         KAllelesModel model{k, 0.001, 0, 0, 0};
         auto obs = create_transition_clone_haploid(model, n, pot, mutk::mutation::ANY);
@@ -895,7 +896,7 @@ TEST_CASE("create_transition_gamete_diploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential::GameteDiploid, 0, 1, u};
+        potential_t pot{mutk::PotentialType::GameteDiploid, IndyId(0), IndyId(1), u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -952,7 +953,7 @@ TEST_CASE("create_transition_child_diploid_diploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential:: ChildDiploidDiploid, 0, 1, u, 2, 1.1f*u};
+        potential_t pot{mutk::PotentialType:: ChildDiploidDiploid, IndyId(0), IndyId(1), u, IndyId(2), 1.1f*u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -1032,7 +1033,7 @@ TEST_CASE("create_transition_child_haploid_diploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential:: ChildHaploidDiploid, 0, 1, u, 2, 1.1f*u};
+        potential_t pot{mutk::PotentialType:: ChildHaploidDiploid, IndyId(0), IndyId(1), u, IndyId(2), 1.1f*u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -1108,7 +1109,7 @@ TEST_CASE("create_transition_child_diploid_haploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential:: ChildDiploidHaploid, 0, 1, u, 2, 1.1f*u};
+        potential_t pot{mutk::PotentialType:: ChildDiploidHaploid, IndyId(0), IndyId(1), u, IndyId(2), 1.1f*u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -1184,7 +1185,7 @@ TEST_CASE("create_transition_child_haploid_haploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential:: ChildHaploidHaploid, 0, 1, u, 2, 1.1f*u};
+        potential_t pot{mutk::PotentialType:: ChildHaploidHaploid, IndyId(0), IndyId(1), u, IndyId(2), 1.1f*u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -1256,7 +1257,7 @@ TEST_CASE("create_transition_child_selfing_diploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential::ChildSelfingDiploid, 0, 1, u};
+        potential_t pot{mutk::PotentialType::ChildSelfingDiploid, IndyId(0), IndyId(1), u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -1326,7 +1327,7 @@ TEST_CASE("create_transition_child_selfing_haploid") {
         CAPTURE(k);
         CAPTURE(u);
 
-        potential_t pot{mutk::detail::Potential::ChildSelfingHaploid, 0, 1, u};
+        potential_t pot{mutk::PotentialType::ChildSelfingHaploid, IndyId(0), IndyId(1), u};
         pot.axes = axes;
         KAllelesModel model(k, 0.001, 0, 0, 0);
 
@@ -1378,7 +1379,7 @@ TEST_CASE("create_transition_child_selfing_haploid") {
 // LCOV_EXCL_STOP
 
 mutk::tensor_t create_unit_potential(size_t n, const potential_t &potential) {
-    assert(potential.type == mutk::detail::Potential::Unit);
+    assert(potential.type == mutk::PotentialType::Unit);
     mutk::shape_t shape;
     for(auto &&a : potential.axes) {
         assert(a == 1 || a == 2);
@@ -1396,7 +1397,7 @@ template<typename Arg>
 inline
 mutk::tensor_t create_mutation_potential(const mutk::mutation::Model &model, 
     size_t n, const potential_t &potential, Arg arg) {
-    using P = mutk::detail::Potential;
+    using P = mutk::PotentialType;
 
     switch(potential.type) {
     case P::CloneDiploid:

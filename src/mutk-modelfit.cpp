@@ -38,7 +38,8 @@
 using namespace std::string_literals;
 
 using InheritanceModel = mutk::InheritanceModel;
-using Potential = mutk::RelationshipGraph::Potential;
+using PotentialType = mutk::PotentialType;
+using IndyId = mutk::IndyId;
 
 namespace {
 struct args_t {
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]) {
         using mutk::utility::unphredf;
         for(int i=0; i < graph.potentials().size(); ++i) {
             const auto &pot = graph.potentials()[i];
-            if(pot.type == Potential::LikelihoodDiploid) {
+            if(pot.type == PotentialType::LikelihoodDiploid) {
                 work.stack[i].resize(diploid_sz);
                 // check for missing data
                 if(mutk::vcf::is_missing(pl(i,0))) {
@@ -176,7 +177,7 @@ int main(int argc, char *argv[]) {
                         work.stack[i](k) = unphredf(pl(i,k));
                     }
                 }
-            } else if(pot.type == Potential::LikelihoodHaploid) {
+            } else if(pot.type == PotentialType::LikelihoodHaploid) {
                 work.stack[i].resize(haploid_sz);
                 // check for missing data
                 if(mutk::vcf::is_missing(pl(i,0))) {
@@ -207,9 +208,9 @@ int main(int argc, char *argv[]) {
                         return;
                     }
                 }
-            } else if(pot.type == Potential::FounderDiploid) {
+            } else if(pot.type == PotentialType::FounderDiploid) {
                 work.stack[i] = founder2;
-            } else if(pot.type == Potential::FounderHaploid) {
+            } else if(pot.type == PotentialType::FounderHaploid) {
                 work.stack[i] = founder1;
             } else {
                 work.stack[i] = model.CreatePotential(haploid_sz, pot, mutk::mutation::ANY);
@@ -235,7 +236,7 @@ int main(int argc, char *argv[]) {
         auto p = model.CreatePriorDiploid(2);
         mutk::Tensor<2> m1 = model.CreateMatrix(2, 1e-8f, mutk::mutation::ANY);
         mutk::Tensor<2> m2 = model.CreateMatrix(2, 2e-8f, mutk::mutation::ANY);
-        mutk::detail::potential_t pot(Potential::ChildDiploidDiploid, 0, 1, 2e-8f, 2, 2e-8f);
+        mutk::potential_t pot(PotentialType::ChildDiploidDiploid, IndyId(0), IndyId(1), 2e-8f, IndyId(2), 2e-8f);
         pot.shuffle = {0,1,2};
         mutk::Tensor<3> m3 = model.CreatePotential(2, pot, mutk::mutation::ANY).
             reshape(mutk::tensor_dims(3,3,3));

@@ -55,6 +55,7 @@
 namespace {
 
 using Sex = mutk::Pedigree::Sex;
+using IndyId = mutk::IndyId;
 
 using samples_t = mutk::RelationshipGraph::samples_t;
 
@@ -78,7 +79,7 @@ void prune(pedigree_graph::Graph &graph, InheritanceModel model);
 
 pedigree_graph::Graph finalize(const pedigree_graph::Graph &input);
 
-std::vector<mutk::RelationshipGraph::potential_t>
+std::vector<mutk::potential_t>
 create_potentials(const pedigree_graph::Graph &graph);
 
 std::pair<std::vector<pedigree_graph::vertex_t>,
@@ -301,9 +302,9 @@ void mutk::RelationshipGraph::ConstructPeeler() {
     for(size_t i = 0; i < potentials_.size(); ++i) {
         neighbors_t label;
         for(auto &&a : potentials_[i].parents) {
-            label.insert(a.first);
+            label.insert(+a.first);
         }
-        label.insert(potentials_[i].child);
+        label.insert(+potentials_[i].child);
         junction_tree::vertex_t v = map_labels_to_jctnodes[label];
         // check for duplicated potentials
         assert(jctnode_to_potential[v] == -1);
@@ -315,11 +316,11 @@ void mutk::RelationshipGraph::ConstructPeeler() {
             continue;
         }
         potential_t unit;
-        unit.child = -1;
-        unit.type = Potential::Unit;
+        unit.child = IndyId(-1);
+        unit.type = PotentialType::Unit;
         auto label = jctnode_labels[v];
         for(auto &&a : label) {
-            unit.parents.emplace_back(a, 0.0f);
+            unit.parents.emplace_back(IndyId(a), 0.0f);
         }
         potentials_.push_back(unit);
         jctnode_to_potential[v] = potentials_.size()-1;
@@ -355,7 +356,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
 
         auto &pot = potentials_[jctnode_to_potential[v]];
 
-        if(pot.type == Potential::Unit) {
+        if(pot.type == PotentialType::Unit) {
             // for unit potentials, use axes to store the node shape as ploidies
             pot.axes.clear();
             for(auto && lab : tensor_lab) {
@@ -367,9 +368,9 @@ void mutk::RelationshipGraph::ConstructPeeler() {
         // Transition matrices when created have axes child,parent,parent
         // identify the proper shuffle axes.
         std::vector<std::pair<std::size_t,std::size_t>> labeled_axes;
-        labeled_axes.emplace_back(elimination_rank_[pot.child],0);
+        labeled_axes.emplace_back(elimination_rank_[+pot.child],0);
         for(size_t i = 0; i < pot.parents.size(); ++i) {
-            labeled_axes.emplace_back(pot.parents[i].first,i+1);
+            labeled_axes.emplace_back(+pot.parents[i].first,i+1);
         }
         // sort the labeled axes so that labels that are eliminated
         // later come earlier.
@@ -447,7 +448,7 @@ void mutk::RelationshipGraph::ConstructPeeler() {
 namespace {
 class Test_ConstructPeeler : public mutk::RelationshipGraph {
 TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Single") {
-    using Potential = mutk::detail::Potential;
+    using PotentialType = mutk::PotentialType;
     const char ped[] = 
         "##PEDNG v0.1\n"
         "A\t.\t.\tF\t=\n";
@@ -466,18 +467,18 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Single") {
         // Checking Potentials
         auto &potentials = relationship_graph.potentials_;
         REQUIRE(potentials.size() == 1+1+1);
-        CHECK(potentials[0].type == Potential::LikelihoodDiploid);
-        CHECK(potentials[0].child == 1);
+        CHECK(potentials[0].type == PotentialType::LikelihoodDiploid);
+        CHECK(+potentials[0].child == 1);
         CHECK(potentials[0].parents.size() == 0);
 
-        CHECK(potentials[1].type == Potential::FounderDiploid);
-        CHECK(potentials[1].child == 0);
+        CHECK(potentials[1].type == PotentialType::FounderDiploid);
+        CHECK(+potentials[1].child == 0);
         CHECK(potentials[1].parents.size() == 0);
 
-        CHECK(potentials[2].type == Potential::CloneDiploid);
-        CHECK(potentials[2].child == 1);
+        CHECK(potentials[2].type == PotentialType::CloneDiploid);
+        CHECK(+potentials[2].child == 1);
         REQUIRE(potentials[2].parents.size() == 1);
-        CHECK(potentials[2].parents[0].first == 0);
+        CHECK(+potentials[2].parents[0].first == 0);
         CHECK(potentials[2].parents[0].second == 1e-6f);
 
         // Elimination Rank
@@ -522,7 +523,7 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Single") {
 }
 
 TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Trio") {
-    using Potential = mutk::detail::Potential;
+    using PotentialType = mutk::PotentialType;
 
     const char ped[] = 
         "##PEDNG v0.1\n"
@@ -547,53 +548,53 @@ TEST_CASE_CLASS("RelationshipGraph-ConstructPeeler Trio") {
 
             REQUIRE(potentials.size() == 3+2+3+1);
 
-            CHECK(potentials[0].type == Potential::LikelihoodDiploid);
-            CHECK(potentials[0].child == 2);
+            CHECK(potentials[0].type == PotentialType::LikelihoodDiploid);
+            CHECK(+potentials[0].child == 2);
             CHECK(potentials[0].parents.size() == 0);
 
-            CHECK(potentials[1].type == Potential::LikelihoodDiploid);
-            CHECK(potentials[1].child == 3);
+            CHECK(potentials[1].type == PotentialType::LikelihoodDiploid);
+            CHECK(+potentials[1].child == 3);
             CHECK(potentials[1].parents.size() == 0);
 
-            CHECK(potentials[2].type == Potential::LikelihoodDiploid);
-            CHECK(potentials[2].child == 4);
+            CHECK(potentials[2].type == PotentialType::LikelihoodDiploid);
+            CHECK(+potentials[2].child == 4);
             CHECK(potentials[2].parents.size() == 0);
 
-            CHECK(potentials[3].type == Potential::FounderDiploid);
-            CHECK(potentials[3].child == 0);
+            CHECK(potentials[3].type == PotentialType::FounderDiploid);
+            CHECK(+potentials[3].child == 0);
             CHECK(potentials[3].parents.size() == 0);
 
-            CHECK(potentials[4].type == Potential::FounderDiploid);
-            CHECK(potentials[4].child == 1);
+            CHECK(potentials[4].type == PotentialType::FounderDiploid);
+            CHECK(+potentials[4].child == 1);
             CHECK(potentials[4].parents.size() == 0);
 
-            CHECK(potentials[5].type == Potential::CloneDiploid);
-            CHECK(potentials[5].child == 2);
+            CHECK(potentials[5].type == PotentialType::CloneDiploid);
+            CHECK(+potentials[5].child == 2);
             REQUIRE(potentials[5].parents.size() == 1);
-            CHECK(potentials[5].parents[0].first == 0);
+            CHECK(+potentials[5].parents[0].first == 0);
             CHECK(potentials[5].parents[0].second == 1e-6f);
 
-            CHECK(potentials[6].type == Potential::ChildDiploidDiploid);
-            CHECK(potentials[6].child == 3);
+            CHECK(potentials[6].type == PotentialType::ChildDiploidDiploid);
+            CHECK(+potentials[6].child == 3);
             REQUIRE(potentials[6].parents.size() == 2);
-            CHECK(potentials[6].parents[0].first == 1);
+            CHECK(+potentials[6].parents[0].first == 1);
             CHECK(potentials[6].parents[0].second == 2e-6f);
-            CHECK(potentials[6].parents[1].first == 0);
+            CHECK(+potentials[6].parents[1].first == 0);
             CHECK(potentials[6].parents[1].second == 2e-6f);
             CHECK_EQ_RANGES(potentials[6].axes, v({0,1,2}));
 
-            CHECK(potentials[7].type == Potential::CloneDiploid);
-            CHECK(potentials[7].child == 4);
+            CHECK(potentials[7].type == PotentialType::CloneDiploid);
+            CHECK(+potentials[7].child == 4);
             REQUIRE(potentials[7].parents.size() == 1);
-            CHECK(potentials[7].parents[0].first == 1);
+            CHECK(+potentials[7].parents[0].first == 1);
             CHECK(potentials[7].parents[0].second == 1e-6f);
 
-            CHECK(potentials[8].type == Potential::Unit);
-            CHECK(potentials[8].child == -1);
+            CHECK(potentials[8].type == PotentialType::Unit);
+            CHECK(+potentials[8].child == -1);
             REQUIRE(potentials[8].parents.size() == 2);
-            CHECK(potentials[8].parents[0].first == 0);
+            CHECK(+potentials[8].parents[0].first == 0);
             CHECK(potentials[8].parents[0].second == 0.0f);
-            CHECK(potentials[8].parents[1].first == 1);
+            CHECK(+potentials[8].parents[1].first == 1);
             CHECK(potentials[8].parents[1].second == 0.0f);
         }
         SUBCASE("Verify Peelers") {
@@ -1280,14 +1281,14 @@ pedigree_graph::Graph finalize(const pedigree_graph::Graph &input) {
     return output;
 }
 
-std::vector<mutk::RelationshipGraph::potential_t>
+std::vector<mutk::potential_t>
 create_potentials(const pedigree_graph::Graph &graph) {
-    using Potential = mutk::RelationshipGraph::Potential;
+    using PotentialType = mutk::PotentialType;
 
     auto ploidies = get(boost::vertex_ploidy, graph);
     auto lengths = get(boost::edge_length, graph);
 
-    std::vector<mutk::RelationshipGraph::potential_t> ret;
+    std::vector<mutk::potential_t> ret;
     
     auto vertex_range = boost::make_iterator_range(vertices(graph));   
     // add samples
@@ -1296,17 +1297,17 @@ create_potentials(const pedigree_graph::Graph &graph) {
         assert(ploidies[v] == 1 || ploidies[v] == 2);
         assert(in_degree(v,graph) <= 2);
         if(out_degree(v,graph) == 0) {
-            auto pot_type = (ploidies[v] == 1) ? Potential::LikelihoodHaploid
-                                               : Potential::LikelihoodDiploid;
-            ret.emplace_back(pot_type, v);
+            auto pot_type = (ploidies[v] == 1) ? PotentialType::LikelihoodHaploid
+                                               : PotentialType::LikelihoodDiploid;
+            ret.emplace_back(pot_type, IndyId(v));
         }
     }
     // add founders
     for(auto v : vertex_range) {
         if(in_degree(v,graph) == 0) {
-            auto pot_type = (ploidies[v] == 1) ? Potential::FounderHaploid
-                                               : Potential::FounderDiploid;
-            ret.emplace_back(pot_type, v);
+            auto pot_type = (ploidies[v] == 1) ? PotentialType::FounderHaploid
+                                               : PotentialType::FounderDiploid;
+            ret.emplace_back(pot_type, IndyId(v));
             // founders can't also be samples, as it ruins assumptions.
             assert(out_degree(v,graph) > 0);
         }
@@ -1318,18 +1319,18 @@ create_potentials(const pedigree_graph::Graph &graph) {
             auto  par1 = source(*ei,graph);
             float len1 = lengths[*ei];
             // identify the type of transition
-            Potential pot_type;
+            PotentialType pot_type;
             if(ploidies[par1] == 2) {
                 // diploid -> diploid (clone) or
                 // diploid -> haploid (gamete)
-                pot_type = (ploidies[v] == 1) ? Potential::GameteDiploid
-                                              : Potential::CloneDiploid;
+                pot_type = (ploidies[v] == 1) ? PotentialType::GameteDiploid
+                                              : PotentialType::CloneDiploid;
             } else {
                 // haploid -> haploid (clone)
                 assert(ploidies[v] == 1);
-                pot_type = Potential::CloneHaploid;
+                pot_type = PotentialType::CloneHaploid;
             }
-            ret.emplace_back(pot_type, v, par1, len1);
+            ret.emplace_back(pot_type, IndyId(v), IndyId(par1), len1);
         } else if(in_degree(v,graph) == 2) {
             auto [ei, ee] = in_edges(v,graph);
             auto  par1 = source(*ei,graph);
@@ -1338,19 +1339,19 @@ create_potentials(const pedigree_graph::Graph &graph) {
             auto  par2 = source(*ei,graph);
             float len2 = lengths[*ei];
             // identify the type of transition
-            Potential pot_type;
+            PotentialType pot_type;
             if(par1 == par2) {
                 // selfing
-                pot_type = (ploidies[v] == 1) ? Potential::ChildSelfingHaploid
-                                              : Potential::ChildSelfingDiploid;
+                pot_type = (ploidies[v] == 1) ? PotentialType::ChildSelfingHaploid
+                                              : PotentialType::ChildSelfingDiploid;
             } else if(ploidies[par1] == 2) {
-                pot_type = (ploidies[par2] == 1) ? Potential::ChildDiploidHaploid
-                                                 : Potential::ChildDiploidDiploid;
+                pot_type = (ploidies[par2] == 1) ? PotentialType::ChildDiploidHaploid
+                                                 : PotentialType::ChildDiploidDiploid;
             } else {
-                pot_type = (ploidies[par2] == 1) ? Potential::ChildHaploidHaploid
-                                                 : Potential::ChildHaploidDiploid;                
+                pot_type = (ploidies[par2] == 1) ? PotentialType::ChildHaploidHaploid
+                                                 : PotentialType::ChildHaploidDiploid;                
             }
-            ret.emplace_back(pot_type, v, par1, len1, par2, len2);
+            ret.emplace_back(pot_type, IndyId(v), IndyId(par1), len1, IndyId(par2), len2);
         }
     }
     return ret;

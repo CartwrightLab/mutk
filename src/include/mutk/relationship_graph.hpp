@@ -82,8 +82,6 @@ class RelationshipGraph {
 public:
     using samples_t = std::vector<const char*>;
     using workspace_t = detail::workspace_t;
-    using Potential = detail::Potential;
-    using potential_t = detail::potential_t;
     using peeling_op_t = detail::peeling_op_t;
 
     using graph_t = detail::pedigree_graph::Graph;
