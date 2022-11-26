@@ -513,18 +513,16 @@ triangulate_graph(const mutk::relationship_graph::Graph &graph) {
         auto & clique = elim_order.emplace_back();
         clique.push_back(v);
         // record neighbors
-        std::vector<LocalGraph::vertex_descriptor> neighbors;
         for(auto n : make_adj_vertex_range(v, local_graph)) {
             clique.push_back(n);
-            neighbors.push_back(n);
         }
         // clear vertex
         clear_vertex(v, local_graph);
 
         // link up neighbors
-        std::unordered_set<LocalGraph::vertex_descriptor> dirty_vertices;
-        for(auto it = neighbors.begin(); it != neighbors.end(); ++it) {
-            for(auto jt = std::next(it); jt != neighbors.end(); ++jt) {
+        std::set<LocalGraph::vertex_descriptor> dirty_vertices;
+        for(auto it = std::next(clique.begin()); it != clique.end(); ++it) {
+            for(auto jt = std::next(it); jt != clique.end(); ++jt) {
                 add_edge(*it, *jt, local_graph);
             }
             // keep track of vertices that need to be recalculated
