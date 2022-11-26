@@ -236,7 +236,8 @@ DOCTEST_MSVC_SUPPRESS_WARNING(4623) // default constructor was implicitly define
     DOCTEST_MSVC_SUPPRESS_WARNING(5039) /* pointer to pot. throwing function passed to extern C */ \
     DOCTEST_MSVC_SUPPRESS_WARNING(5045) /* Spectre mitigation for memory load */                   \
     DOCTEST_MSVC_SUPPRESS_WARNING(5105) /* macro producing 'defined' has undefined behavior */     \
-    DOCTEST_MSVC_SUPPRESS_WARNING(4738) /* storing float result in memory, loss of performance */
+    DOCTEST_MSVC_SUPPRESS_WARNING(4738) /* storing float result in memory, loss of performance */  \
+    DOCTEST_MSVC_SUPPRESS_WARNING(5262) /* implicit fall-through */
 
 #define DOCTEST_MAKE_STD_HEADERS_CLEAN_FROM_WARNINGS_ON_WALL_END DOCTEST_MSVC_SUPPRESS_WARNING_POP
 
@@ -378,6 +379,14 @@ DOCTEST_MSVC_SUPPRESS_WARNING(4623) // default constructor was implicitly define
 #endif // DOCTEST_MSVC
 #endif // DOCTEST_CONSTEXPR
 
+#ifndef DOCTEST_NO_SANITIZE_INTEGER
+#if DOCTEST_CLANG >= DOCTEST_COMPILER(3, 7, 0)
+#define DOCTEST_NO_SANITIZE_INTEGER __attribute__((no_sanitize("integer")))
+#else
+#define DOCTEST_NO_SANITIZE_INTEGER
+#endif
+#endif // DOCTEST_NO_SANITIZE_INTEGER
+
 // =================================================================================================
 // == FEATURE DETECTION END ========================================================================
 // =================================================================================================
@@ -428,6 +437,13 @@ namespace doctest { namespace detail {
 #define DOCTEST_GLOBAL_NO_WARNINGS(var, ...)                                                         \
     DOCTEST_CLANG_SUPPRESS_WARNING_WITH_PUSH("-Wglobal-constructors")                                \
     static const int var = doctest::detail::consume(&var, __VA_ARGS__);                              \
+    DOCTEST_CLANG_SUPPRESS_WARNING_POP
+
+#define DOCTEST_GLOBAL_NO_WARNINGS_CLASS(var, ...)                                                 \
+    DOCTEST_CLANG_SUPPRESS_WARNING_WITH_PUSH("-Wglobal-constructors")                              \
+    DOCTEST_CLANG_SUPPRESS_WARNING("-Wunused-variable")                                            \
+    /* NOLINT(fuchsia-statically-constructed-objects,cert-err58-cpp) */                            \
+    static const int var DOCTEST_UNUSED                                                            \
     DOCTEST_CLANG_SUPPRESS_WARNING_POP
 
 #ifndef DOCTEST_BREAK_INTO_DEBUGGER
@@ -1000,8 +1016,13 @@ namespace detail {
     struct has_insertion_operator : types::false_type { };
 #endif
 
-template <typename T>
-struct has_insertion_operator<T, decltype(operator<<(declval<std::ostream&>(), declval<const T&>()), void())> : types::true_type { };
+    template <typename T>
+    struct has_insertion_operator<T, decltype(operator<<(declval<std::ostream&>(), declval<const T&>()), void())> : types::true_type { };
+
+    template <typename T>
+    struct should_stringify_as_underlying_type {
+        static DOCTEST_CONSTEXPR bool value = detail::types::is_enum<T>::value && !doctest::detail::has_insertion_operator<T>::value;
+    };
 
     DOCTEST_INTERFACE std::ostream* tlssPush();
     DOCTEST_INTERFACE String tlssPop();
@@ -1074,7 +1095,7 @@ String toString() {
 #endif
 }
 
-template <typename T, typename detail::types::enable_if<!detail::types::is_enum<T>::value, bool>::type = true>
+template <typename T, typename detail::types::enable_if<!detail::should_stringify_as_underlying_type<T>::value, bool>::type = true>
 String toString(const DOCTEST_REF_WRAP(T) value) {
     return StringMaker<T>::convert(value);
 }
@@ -1110,7 +1131,7 @@ DOCTEST_INTERFACE String toString(long unsigned in);
 DOCTEST_INTERFACE String toString(long long in);
 DOCTEST_INTERFACE String toString(long long unsigned in);
 
-template <typename T, typename detail::types::enable_if<detail::types::is_enum<T>::value, bool>::type = true>
+template <typename T, typename detail::types::enable_if<detail::should_stringify_as_underlying_type<T>::value, bool>::type = true>
 String toString(const DOCTEST_REF_WRAP(T) value) {
     using UT = typename detail::types::underlying_type<T>::type;
     return (DOCTEST_STRINGIFY(static_cast<UT>(value)));
@@ -1162,8 +1183,18 @@ DOCTEST_MSVC_SUPPRESS_WARNING_POP
 
     template <typename T>
     struct filldata<T*> {
+DOCTEST_MSVC_SUPPRESS_WARNING_WITH_PUSH(4180)
         static void fill(std::ostream* stream, const T* in) {
-            filldata<const void*>::fill(stream, in);
+DOCTEST_MSVC_SUPPRESS_WARNING_POP
+DOCTEST_CLANG_SUPPRESS_WARNING_WITH_PUSH("-Wmicrosoft-cast")
+            filldata<const void*>::fill(stream,
+#if DOCTEST_GCC == 0 || DOCTEST_GCC >= DOCTEST_COMPILER(4, 9, 0)
+                reinterpret_cast<const void*>(in)
+#else
+                *reinterpret_cast<const void* const*>(&in)
+#endif
+            );
+DOCTEST_CLANG_SUPPRESS_WARNING_POP
         }
     };
 }
@@ -2144,7 +2175,13 @@ int registerReporter(const char* name, int priority, bool isReporter) {
 
 #define DOCTEST_CREATE_AND_REGISTER_FUNCTION_IN_CLASS(f, proxy, decorators)                        \
     static doctest::detail::funcType proxy() { return f; }                                         \
-    DOCTEST_REGISTER_FUNCTION(inline, proxy(), decorators)                                         \
+        /* NOLINT */                                                                               \
+        inline DOCTEST_GLOBAL_NO_WARNINGS_CLASS(DOCTEST_ANONYMOUS(DOCTEST_ANON_VAR_) =             \
+            doctest::detail::regTest(                                                              \
+                    doctest::detail::TestCase(                                                     \
+                            proxy(), __FILE__, __LINE__,                                           \
+                            doctest_detail_test_suite_ns::getCurrentTestSuite()) *                 \
+                    decorators);)                                                                  \
     static void f()
 
 // for registering tests
@@ -2159,7 +2196,7 @@ int registerReporter(const char* name, int priority, bool isReporter) {
                                                   decorators)
 #else // DOCTEST_TEST_CASE_CLASS
 #define DOCTEST_TEST_CASE_CLASS(...)                                                               \
-    TEST_CASES_CAN_BE_REGISTERED_IN_CLASSES_ONLY_IN_CPP17_MODE_OR_WITH_VS_2017_OR_NEWER
+    static_assert(false, "Test cases can be registered in classes only in C++ >= 17");
 #endif // DOCTEST_TEST_CASE_CLASS
 
 // for registering tests with a fixture
@@ -3156,9 +3193,11 @@ DOCTEST_MAKE_STD_HEADERS_CLEAN_FROM_WARNINGS_ON_WALL_BEGIN
 // defines for a leaner windows.h
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#define DOCTEST_UNDEF_WIN32_LEAN_AND_MEAN
 #endif // WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
 #define NOMINMAX
+#define DOCTEST_UNDEF_NOMINMAX
 #endif // NOMINMAX
 
 // not sure what AfxWin.h is for - here I do what Catch does
@@ -4105,11 +4144,13 @@ namespace {
         return false;
     }
 
+    DOCTEST_NO_SANITIZE_INTEGER
     unsigned long long hash(unsigned long long a, unsigned long long b) {
         return (a << 5) + b;
     }
 
     // C string hash function (djb2) - taken from http://www.cse.yorku.ca/~oz/hash.html
+    DOCTEST_NO_SANITIZE_INTEGER
     unsigned long long hash(const char* str) {
         unsigned long long hash = 5381;
         char c;
@@ -7017,3 +7058,13 @@ DOCTEST_SUPPRESS_COMMON_WARNINGS_POP
 
 #endif // DOCTEST_LIBRARY_IMPLEMENTATION
 #endif // DOCTEST_CONFIG_IMPLEMENT
+
+#ifdef DOCTEST_UNDEF_WIN32_LEAN_AND_MEAN
+#undef WIN32_LEAN_AND_MEAN
+#undef DOCTEST_UNDEF_WIN32_LEAN_AND_MEAN
+#endif // DOCTEST_UNDEF_WIN32_LEAN_AND_MEAN
+
+#ifdef DOCTEST_UNDEF_NOMINMAX
+#undef NOMINMAX
+#undef DOCTEST_UNDEF_NOMINMAX
+#endif // DOCTEST_UNDEF_NOMINMAX
