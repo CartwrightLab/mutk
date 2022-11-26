@@ -1,3 +1,5 @@
+simplify_graph() simplifies relationship graphs
+triangulate_graph() identifies cliques
 KAllelesModel-Constructor
 KAllelesModel-CreateMatrix with any_t
 KAllelesModel-CreateMatrix with int
@@ -17,7 +19,9 @@ parse_newick
 Pedigree-parse_sex
 Pedigree-parse_text
 RelationshipGraph-ConstructGraph
-RelationshipGraph-ConstructPeeler
-GeneralPeelingVertex<N>-Forward
+RelationshipGraph-ConstructPeeler Single
+RelationshipGraph-ConstructPeeler Trio
+GeneralPeelingVertex-MakeMetadata
+GeneralPeelingVertex-Forward
 version_number_check_equal
 version_integer

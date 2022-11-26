@@ -1578,7 +1578,8 @@ TEST_CASE_CLASS("GeneralPeelingVertex-MakeMetadata") {
 
     CHECK(v.output_data_.index == 2);
     CHECK(v.output_data_.shape == shape_t{1});
-}};}
+}};
+}
 // LCOV_EXCL_STOP
 
 void mutk::GeneralPeelingVertex::AddLocal(const std::vector<PeelingVertex::label_t> &labels,
