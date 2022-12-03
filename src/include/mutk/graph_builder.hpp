@@ -62,7 +62,6 @@ enum struct sample_id_t : int {};
 constexpr auto operator+(sample_id_t value) {
     return static_cast<std::underlying_type_t<sample_id_t>>(value);
 }
-
 namespace relationship_graph {
 
 enum struct VertexPloidy : int {
@@ -70,6 +69,14 @@ enum struct VertexPloidy : int {
     Haploid = 1,
     Diploid = 2
 };
+
+enum struct variable_t : int {};
+constexpr auto operator+(variable_t value) {
+    return static_cast<std::underlying_type_t<variable_t>>(value);
+}
+
+
+namespace graph {
 
 using EdgeLengthProp = boost::property<boost::edge_length_t, float>;
 using EdgeProp = EdgeLengthProp;
@@ -82,6 +89,28 @@ using VertexProp = VertexLabelProp;
 using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
         VertexProp, EdgeProp>;
 }
+
+namespace junction_tree {
+
+using VertexLabelProp = boost::property<boost::vertex_label_t, std::vector<variable_t>>;
+using VertexProp = VertexLabelProp;
+
+using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
+        VertexProp, boost::no_property>;
+
+}
+
+using Graph = graph::Graph;
+using JunctionTree = junction_tree::Graph;
+
+}
+
+struct potential_t {
+    std::vector<relationship_graph::variable_t> variables;
+    std::vector<float> edge_lengths;
+};
+
+using clique_t = std::vector<mutk::relationship_graph::Graph::vertex_descriptor>;
 
 class GraphBuilder {
  public:

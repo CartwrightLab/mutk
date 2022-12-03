@@ -51,18 +51,25 @@ template<class G>
 auto make_inv_vertex_range(typename G::vertex_descriptor v,  G &graph) {
     return boost::make_iterator_range(inv_adjacent_vertices(v, graph));
 }
-
 }
 
 using mutk::member_id_t;
 
+using mutk::potential_t;
+
 static mutk::relationship_graph::Graph
 simplify_graph(mutk::relationship_graph::Graph &graph);
 
-using clique_t = std::vector<mutk::relationship_graph::Graph::vertex_descriptor>;
-
 static std::vector<clique_t>
 triangulate_graph(const mutk::relationship_graph::Graph &graph);
+
+static std::vector<potential_t>
+calculate_potentials(const mutk::relationship_graph::Graph &graph);
+
+static mutk::relationship_graph::JunctionTree
+create_junction_tree(const mutk::relationship_graph::Graph &graph,
+    const std::vector<potential_t> &potentials,
+    const std::vector<clique_t> &elimination_order);
 
 // Convert `name` into a member id. If `name` is already registered, it
 // return the registered id number. Otherwise add `name` to the registry.
@@ -130,6 +137,8 @@ void mutk::GraphBuilder::BuildGraph(const InheritanceModel &model, float mu) {
     auto initial_graph = CreateInitialGraph(model, mu);
 
     auto graph = simplify_graph(initial_graph);
+
+    auto potentials = calculate_potentials(graph);
 
     auto cliques = triangulate_graph(graph);
 
@@ -592,3 +601,29 @@ TEST_CASE("triangulate_graph() identifies cliques") {
     }
 }
 // LCOV_EXCL_STOP
+
+std::vector<potential_t>
+calculate_potentials(const mutk::relationship_graph::Graph &graph) {
+    std::vector<potential_t> potentials;
+
+    for(auto v : make_vertex_range(graph)) {
+        {
+            // Add a potential for this single node
+            auto & pot = potentials.emplace_back();
+            pot.variables.emplace_back(v);
+            pot.edge_lengths.push_back(0.0f);
+        }
+        if(in_degree(v,graph) > 0) {
+            // Add a potential for this family
+            auto & pot = potentials.emplace_back();
+            pot.variables.emplace_back(v);
+            pot.edge_lengths.push_back(0.0f);
+            for(auto e : boost::make_iterator_range(in_edges(v,graph))) {
+                pot.variables.emplace_back(source(e, graph));
+                pot.edge_lengths.push_back(get(boost::edge_length, graph, e));
+            }
+        }
+    }
+
+    return potentials;
+}
