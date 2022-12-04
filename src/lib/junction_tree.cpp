@@ -92,61 +92,19 @@ set_diff_size(const SinglePassRange1& rng1,
 }
 
 namespace {
-struct cost_result_t {
-    size_t cost;
-    bool   is_new_node;
-    int    out_degree;
-    const vertex_set_t * labels;
-    vertex_t v;
+struct source_t {
+    vertex_t source;
+    int label_size;
+    bool not_a_subset_of_source;
+    int out_degree;
+    vertex_set_t label;
 
-    friend bool operator<(const cost_result_t & lhs, const cost_result_t & rhs) {
-        return std::tie(lhs.cost, lhs.is_new_node, lhs.out_degree, *lhs.labels, lhs.v) <
-               std::tie(rhs.cost, rhs.is_new_node, rhs.out_degree, *rhs.labels, rhs.v);
+    friend bool operator<(const source_t & lhs, const source_t & rhs) {
+        return std::make_tuple(lhs.label_size, lhs.not_a_subset_of_source, lhs.out_degree, lhs.label) <
+               std::make_tuple(rhs.label_size, rhs.not_a_subset_of_source, rhs.out_degree, rhs.label);
     }
 };
-
-class cost_visitor : public boost::default_dfs_visitor {
- public:
-    cost_visitor(vertex_t query, cost_result_t &output, const std::vector<vertex_set_t> &node_labels) : 
-        query_{query}, output_{output}, node_labels_(node_labels) {}
-
-    void start_vertex(vertex_t v,  const JunctionTree & graph) {
-        // initialize cost based on the union of v and query
-        output_.cost = set_union_size(node_labels_[v], node_labels_[query_]);
-        output_.is_new_node = true;
-        output_.out_degree = out_degree(v, graph);
-        output_.labels = &node_labels_[v];
-        output_.v = v;
-    }
-    void finish_vertex(vertex_t v, const JunctionTree & graph) {
-        // Unless we write our own DFS algorithm, includes must be called
-        // twice per visited vertex. Once to check for termination.
-        // Another to check if we have terminated.
-        if(!boost::range::includes(node_labels_[v], node_labels_[query_])) {
-            return;
-        }
-        // Prefer a vertex with the lowest cost
-        size_t cost = node_labels_[v].size();
-        if(cost > output_.cost) {
-            return;
-        }
-        cost_result_t lhs;
-        lhs.cost = cost;
-        lhs.is_new_node = false;
-        lhs.out_degree = out_degree(v, graph);
-        lhs.labels = &node_labels_[v];
-        lhs.v = v;
-        if(lhs < output_) {
-            output_ = lhs;
-        }
-    }
-
-    vertex_t query_;
-    cost_result_t &output_;
-    const std::vector<vertex_set_t> &node_labels_;
-};
-}
-
+} // anon namespace
 
 // Try to link v2 into the graph that begins at v1
 // If v2 is not a subset of v1, we will need to create a new node
@@ -157,31 +115,64 @@ class cost_visitor : public boost::default_dfs_visitor {
 // prefer the one that has the smallest degree. If nodes are still tied,
 // prefer the one with the smallest label set.
 static
-std::tuple<cost_result_t, vertex_t, vertex_t>
-find_best_connection(vertex_t v1, vertex_t v2, const JunctionTree & graph,
+source_t
+find_best_connection(vertex_t root, vertex_t query, const JunctionTree & graph,
         const std::vector<vertex_set_t> & node_labels) {
-    if(node_labels[v1].size() < node_labels[v2].size()) {
-        std::swap(v1,v2);
+    using boost::range::includes;
+
+    // attach query to a node that is the union of root and query
+    source_t result;
+    result.source = root;
+    result.label = node_labels[root];
+    result.label.insert(boost::container::ordered_unique_range_t{},
+        node_labels[query].begin(), node_labels[query].end());
+    result.label_size = result.label.size();
+    result.not_a_subset_of_source = true;
+    result.out_degree = 1;
+
+    // If query is not a subset of root node then the only place we can
+    // attach is at a new node.
+    if(!includes(node_labels[root], node_labels[query])) {
+        return result;
     }
-    using Color = boost::color_traits< boost::default_color_type >;
+    // do a depth first search looking for a better attachment point
+    using AdjIter = JunctionTree::adjacency_iterator;
+    using VertexInfo = std::pair<vertex_t, std::pair<AdjIter, AdjIter>>;
+    std::vector<VertexInfo> stack;
 
-    cost_result_t result;
-    cost_visitor vis(v2, result, node_labels);
-
-    std::vector< boost::default_color_type > color_map(
-        num_vertices(graph), Color::white());
-
-    boost::default_color_type c = Color::white();
-
-    auto term_func = [&](vertex_t v, const JunctionTree & g) {
-        return !boost::range::includes(node_labels[v], node_labels[v2]);
-    };
-
-    boost::depth_first_visit(graph, v1, vis,
-        boost::make_iterator_property_map(color_map.begin(),
-            get(boost::vertex_index, graph), c), term_func);
-
-    return {result, v1, v2};
+    // initialize our search at the root node
+    vertex_t u = root;
+    auto [ai, ai_end] = adjacent_vertices(u, graph);
+    stack.push_back({u, {ai, ai_end}});
+    while(!stack.empty()) {
+        u = stack.back().first;
+        std::tie(ai, ai_end) = stack.back().second;
+        stack.pop_back();
+        while(ai != ai_end) {
+            // Change context of search if query is a subset of an adjacent vertex
+            vertex_t v = *ai;
+            if(includes(node_labels[v], node_labels[query])) {
+                stack.push_back({u, {++ai, ai_end}});
+                u = v;
+                std::tie(ai, ai_end) = adjacent_vertices(u, graph);
+            } else {
+                ++ai;
+            }
+        }
+        // Test if this node is a better match than the current best node.
+        if(node_labels[u].size() <= result.label_size) {
+            source_t here;
+            here.source = u;
+            here.label = node_labels[u];
+            here.label_size = here.label.size();
+            here.not_a_subset_of_source = false;
+            here.out_degree = out_degree(u, graph);
+            if(here < result) {
+                result = here;
+            }
+        }
+    }
+    return result;
 }
 
 mutk::relationship_graph::JunctionTree
@@ -221,6 +212,14 @@ create_junction_tree(const mutk::relationship_graph::Graph &graph,
         active_nodes.push_back(i);
     }
 
+    // helper lambda function
+    auto order_nodes = [&](vertex_t v1, vertex_t v2) {
+        if(node_labels[v1].size() < node_labels[v2].size()) {
+            std::swap(v1,v2);
+        }
+        return std::make_pair(v1,v2);
+    };
+
     // Construct the augmented junction tree using binary fusion
     for(int var=0; var < elimination_order.size(); ++var) {
         // identify active nodes that contain `var` and move them to working nodes
@@ -236,35 +235,37 @@ create_junction_tree(const mutk::relationship_graph::Graph &graph,
             // find which pair of labels can be merged with lowest cost
             auto it = working_nodes.begin();
             auto jt = std::next(it);
-            auto bit = it;
-            auto bjt = jt;
-            auto best = find_best_connection(*it, *jt, junction, node_labels);
+            auto [v1, v2] = order_nodes(*it, *jt);
+            auto best = find_best_connection(v1, v2, junction, node_labels);
+            auto best_pair = std::make_pair(it, jt);
             for(++jt; jt != working_nodes.end(); ++it) {
                 for(it = working_nodes.begin(); it != jt; ++it) {
-                    auto result = find_best_connection(*it, *jt, junction, node_labels);
-                    if(std::get<0>(result) < std::get<0>(best)) {
+                    auto [v1, v2] = order_nodes(*it, *jt);
+                    auto result = find_best_connection(v1, v2, junction, node_labels);
+                    if(result < best) {
                         best = result;
-                        bjt = jt;
-                        bit = it;
+                        best_pair = {it, jt};
                     }
                 }
             }
             // Result holds information about the best location to attach v2 to v1.
             // bit and bjt are iterators to the locations of v2 and v1. bit occurs
             // before bjt in the sequence. bit and bjt can refer to either v1 or v2.
-            auto [result, v1, v2] = best;
-            if(result.is_new_node) {
+            std::tie(it, jt) = best_pair;
+            std::tie(v1, v2) = order_nodes(*it, *jt);
+            if(best.not_a_subset_of_source) {
                 // construct a new node and label it with the
                 // union of the two nodes.
                 auto u = add_vertex(junction);
                 node_labels.push_back(node_labels[v1]);
-                node_labels.back().merge(node_labels[v2]);
+                node_labels.back().insert(boost::container::ordered_unique_range_t{},
+                    node_labels[v2].begin(), node_labels[v2].end());
                 add_edge(u,v1,junction);
                 add_edge(u,v2,junction);
-                *bit = u;
+                *it = u;
             } else {
                 // attach v2 to u, duplicating node as needed
-                auto u = result.v;
+                auto u = best.source;
                 if(out_degree(u, junction) > 1) {
                     auto w = add_vertex(junction);
                     node_labels.push_back(node_labels[u]);
@@ -281,11 +282,11 @@ create_junction_tree(const mutk::relationship_graph::Graph &graph,
 
                 }
                 add_edge(u, v2, junction);
-                *bit = v1;
+                *it = v1;
             }
-            // bit refers to a new node
-            // bjt needs to be erased
-            working_nodes.erase(bjt);
+            // it refers to a new node
+            // jt needs to be erased
+            working_nodes.erase(jt);
         }
         // only 1 working node left
         vertex_t v = working_nodes.front();

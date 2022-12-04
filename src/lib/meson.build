@@ -6,7 +6,8 @@ libmutk_sources = files([
   'newick.cpp',
   'relationship_graph.cpp',
   'mutation.cpp',
-  'graph_builder.cpp'
+  'graph_builder.cpp',
+  'junction_tree.cpp'
 ])
 
 libmutk_deps = [boost_dep, doctest_dep, eigen_dep, xtensor_dep, xblas_dep]
