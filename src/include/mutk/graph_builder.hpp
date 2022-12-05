@@ -75,7 +75,6 @@ constexpr auto operator+(variable_t value) {
     return static_cast<std::underlying_type_t<variable_t>>(value);
 }
 
-
 namespace graph {
 
 using EdgeLengthProp = boost::property<boost::edge_length_t, float>;
@@ -97,7 +96,6 @@ using VertexProp = VertexLabelProp;
 
 using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
         VertexProp, boost::no_property>;
-
 }
 
 using Graph = graph::Graph;
@@ -155,6 +153,12 @@ class GraphBuilder {
 
     std::vector<component_t> components_;
 };
+
+
+mutk::relationship_graph::JunctionTree
+create_junction_tree(const mutk::relationship_graph::Graph &graph,
+    const std::vector<potential_t> &potentials,
+    const std::vector<clique_t> &elimination_order);
 
 }
 

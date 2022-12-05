@@ -36,7 +36,6 @@
 
 #include "mutk/graph_builder.hpp"
 
-namespace {
 template<class G>
 auto make_vertex_range(G &graph) {
     return boost::make_iterator_range(vertices(graph));
@@ -51,11 +50,12 @@ template<class G>
 auto make_inv_vertex_range(typename G::vertex_descriptor v,  G &graph) {
     return boost::make_iterator_range(inv_adjacent_vertices(v, graph));
 }
-}
 
 using mutk::member_id_t;
 
 using mutk::potential_t;
+
+using mutk::clique_t;
 
 static mutk::relationship_graph::Graph
 simplify_graph(mutk::relationship_graph::Graph &graph);
@@ -65,11 +65,6 @@ triangulate_graph(const mutk::relationship_graph::Graph &graph);
 
 static std::vector<potential_t>
 calculate_potentials(const mutk::relationship_graph::Graph &graph);
-
-static mutk::relationship_graph::JunctionTree
-create_junction_tree(const mutk::relationship_graph::Graph &graph,
-    const std::vector<potential_t> &potentials,
-    const std::vector<clique_t> &elimination_order);
 
 // Convert `name` into a member id. If `name` is already registered, it
 // return the registered id number. Otherwise add `name` to the registry.
@@ -604,22 +599,24 @@ TEST_CASE("triangulate_graph() identifies cliques") {
 
 std::vector<potential_t>
 calculate_potentials(const mutk::relationship_graph::Graph &graph) {
+    using mutk::relationship_graph::variable_t;
+
     std::vector<potential_t> potentials;
 
     for(auto v : make_vertex_range(graph)) {
         {
             // Add a potential for this single node
             auto & pot = potentials.emplace_back();
-            pot.variables.emplace_back(v);
+            pot.variables.push_back(variable_t(v));
             pot.edge_lengths.push_back(0.0f);
         }
         if(in_degree(v,graph) > 0) {
             // Add a potential for this family
             auto & pot = potentials.emplace_back();
-            pot.variables.emplace_back(v);
+            pot.variables.push_back(variable_t(v));
             pot.edge_lengths.push_back(0.0f);
             for(auto e : boost::make_iterator_range(in_edges(v,graph))) {
-                pot.variables.emplace_back(source(e, graph));
+                pot.variables.push_back(variable_t(source(e, graph)));
                 pot.edge_lengths.push_back(get(boost::edge_length, graph, e));
             }
         }

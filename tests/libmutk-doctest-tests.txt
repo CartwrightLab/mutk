@@ -1,5 +1,6 @@
 simplify_graph() simplifies relationship graphs
 triangulate_graph() identifies cliques
+create_junction_tree() constructs a junction tree.
 KAllelesModel-Constructor
 KAllelesModel-CreateMatrix with any_t
 KAllelesModel-CreateMatrix with int
