@@ -50,7 +50,7 @@ void check_eq_ranges_impl(const A& a, const B& b, const char* msg, const char* f
         oss << "\n  size: " << std::size(a) << " != " << std::size(b);
     }
     ADD_FAIL_CHECK_AT(file, line, doctest::Color::Cyan <<
-        "CHECK_EQ_RANGES( " << msg << " )" << doctest::Color::None << " is NOT correct!"
+        "CHECK_EQ_RANGES( " << std::string(msg) << " )" << doctest::Color::None << " is NOT correct!"
         << oss.str());
 }
 }

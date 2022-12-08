@@ -33,6 +33,7 @@
 #include <boost/algorithm/cxx11/none_of.hpp>
 #include <boost/algorithm/cxx11/one_of.hpp>
 #include <boost/heap/d_ary_heap.hpp>
+#include <boost/graph/topological_sort.hpp>
 
 #include "mutk/graph_builder.hpp"
 
@@ -53,7 +54,7 @@ auto make_inv_vertex_range(typename G::vertex_descriptor v,  G &graph) {
 
 using mutk::member_id_t;
 
-using mutk::potential_t;
+using mutk::xpotential_t;
 
 using mutk::clique_t;
 
@@ -63,7 +64,7 @@ simplify_graph(mutk::relationship_graph::Graph &graph);
 static std::vector<clique_t>
 triangulate_graph(const mutk::relationship_graph::Graph &graph);
 
-static std::vector<potential_t>
+static std::vector<xpotential_t>
 calculate_potentials(const mutk::relationship_graph::Graph &graph);
 
 // Convert `name` into a member id. If `name` is already registered, it
@@ -597,11 +598,11 @@ TEST_CASE("triangulate_graph() identifies cliques") {
 }
 // LCOV_EXCL_STOP
 
-std::vector<potential_t>
+std::vector<xpotential_t>
 calculate_potentials(const mutk::relationship_graph::Graph &graph) {
     using mutk::relationship_graph::variable_t;
 
-    std::vector<potential_t> potentials;
+    std::vector<xpotential_t> potentials;
 
     for(auto v : make_vertex_range(graph)) {
         {

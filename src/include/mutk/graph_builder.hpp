@@ -30,7 +30,6 @@
 #include <unordered_map>
 
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/topological_sort.hpp>
 
 #include "inheritance_model.hpp"
 
@@ -103,7 +102,7 @@ using JunctionTree = junction_tree::Graph;
 
 }
 
-struct potential_t {
+struct xpotential_t {
     std::vector<relationship_graph::variable_t> variables;
     std::vector<float> edge_lengths;
 };
@@ -157,7 +156,7 @@ class GraphBuilder {
 
 mutk::relationship_graph::JunctionTree
 create_junction_tree(const mutk::relationship_graph::Graph &graph,
-    const std::vector<potential_t> &potentials,
+    const std::vector<xpotential_t> &potentials,
     const std::vector<clique_t> &elimination_order);
 
 }
