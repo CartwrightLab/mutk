@@ -26,8 +26,6 @@
 
 #include <iostream>
 
-#include <boost/container/small_vector.hpp>
-#include <boost/container/flat_set.hpp>
 #include <boost/range/algorithm/set_algorithm.hpp>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/algorithm_ext/erase.hpp>
@@ -46,10 +44,8 @@ auto make_adj_vertex_range(typename G::vertex_descriptor v,  G &graph) {
     return boost::make_iterator_range(adjacent_vertices(v, graph));
 }
 
-using mutk::xpotential_t;
+using mutk::component_t;
 using mutk::clique_t;
-
-
 
 using vertex_set_t = boost::container::flat_set<int, std::less<int>,
     boost::container::small_vector<int, 4>>;
@@ -156,7 +152,7 @@ find_best_connection(vertex_t root, vertex_t query, const directed_tree_t & grap
 
 mutk::relationship_graph::JunctionTree
 mutk::create_junction_tree(const mutk::relationship_graph::Graph &graph,
-    const std::vector<xpotential_t> &potentials,
+    const std::vector<component_t> &potentials,
     const std::vector<clique_t> &elimination_order) {
 
     using mutk::relationship_graph::variable_t;
@@ -343,7 +339,7 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
     using mutk::relationship_graph::JunctionTree;
     using mutk::relationship_graph::variable_t;
 
-    auto mkpot = [](const std::initializer_list<int> & range) -> xpotential_t {
+    auto mkpot = [](const std::initializer_list<int> & range) -> component_t {
         std::vector<variable_t> ret;
         for(auto v : range) {
             ret.push_back(variable_t(v));
@@ -390,7 +386,7 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
         add_edge(2,4,graph);
         add_edge(5,6,graph);
 
-        std::vector<xpotential_t> potentials;
+        std::vector<component_t> potentials;
         potentials.push_back(mkpot({2,0,1}));  // 0
         potentials.push_back(mkpot({3,2}));    // 1
         potentials.push_back(mkpot({4,2}));    // 2
@@ -439,7 +435,7 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
         add_edge(0,3,graph);
         add_edge(0,4,graph);
 
-        std::vector<xpotential_t> potentials;
+        std::vector<component_t> potentials;
         potentials.push_back(mkpot({1,0}));    // 0
         potentials.push_back(mkpot({2,0}));    // 1
         potentials.push_back(mkpot({3,0}));    // 2
@@ -483,7 +479,7 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
         add_edge(6,8,graph);
         add_edge(7,8,graph);
 
-        std::vector<xpotential_t> potentials;
+        std::vector<component_t> potentials;
         potentials.push_back(mkpot({3,0,1}));
         potentials.push_back(mkpot({4,0,1}));
         potentials.push_back(mkpot({6,2,3}));

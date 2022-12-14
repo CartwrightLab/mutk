@@ -22,59 +22,26 @@
 # SOFTWARE.
 */
 
-#ifndef MUTK_MEMORY_HPP
-#define MUTK_MEMORY_HPP
+#include <mutk/potential.hpp>
 
-#include <cstdint>
-#include <cfloat>
-#include <algorithm>
-#include <initializer_list>
+using mutk::message_t;
 
-#include <xtensor-blas/xlinalg.hpp>
-#include <xtensor/xarray.hpp>
-#include <xtensor/xio.hpp>
-#include <xtensor/xgenerator.hpp>
+// ==== UNIT POTENTIAL =========================================================
 
-namespace mutk {
-
-using float_t = float;
-using tensor_t = xt::xarray<float_t>;
-using shape_t = tensor_t::shape_type;
-using strides_t = tensor_t::strides_type;
-
-inline
-constexpr tensor_t::size_type num_diploids(tensor_t::size_type n) {
-    return n*(n+1)/2;
+message_t mutk::UnitPotential::Create(size_t n, any_t) {
+    auto shape = message_shape(n, labels_);
+    return xt::ones<float_t>(shape);
 }
 
-template<int N>
-constexpr tensor_t::size_type dim_width(tensor_t::size_type n) {
-    static_assert(N == 1 || N == 2);
-    if constexpr(N == 1) {
-        return n;
-    } else {
-        return num_diploids(n);
+message_t mutk::UnitPotential::Create(size_t n, mean_t) {
+    auto shape = message_shape(n, labels_);
+    return xt::zeros<float_t>(shape);
+}
+
+message_t mutk::UnitPotential::Create(size_t n, some_t k) {
+    auto shape = message_shape(n, labels_);
+    if(+k == 0) {
+        return xt::ones<float_t>(shape);
     }
+    return xt::zeros<float_t>(shape);
 }
-
-} // namespace mutk
-
-// for debugging purposes
-namespace std {
-inline
-std::ostream& operator<< (std::ostream& os, const mutk::shape_t& value) {
-    os << "{";
-    for(size_t i = 0; i < value.size(); ++i) {
-        if(i > 0) {
-            os << ", ";
-        }
-        os << value[i];
-    }
-    os << "}";
-    return os;
-}
-}
-
-
-
-#endif // MUTK_MEMORY_HPP

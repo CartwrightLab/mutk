@@ -32,6 +32,7 @@
 #include <boost/graph/adjacency_list.hpp>
 
 #include "inheritance_model.hpp"
+#include "potential.hpp"
 
 // Install boost graph properties
 namespace boost {
@@ -63,24 +64,13 @@ constexpr auto operator+(sample_id_t value) {
 }
 namespace relationship_graph {
 
-enum struct VertexPloidy : int {
-    Noploid = 0,
-    Haploid = 1,
-    Diploid = 2
-};
-
-enum struct variable_t : int {};
-constexpr auto operator+(variable_t value) {
-    return static_cast<std::underlying_type_t<variable_t>>(value);
-}
-
 namespace graph {
 
 using EdgeLengthProp = boost::property<boost::edge_length_t, float>;
 using EdgeProp = EdgeLengthProp;
 
 using VertexDataProp   = boost::property<boost::vertex_data_t, std::vector<sample_id_t>>;
-using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, VertexPloidy, VertexDataProp>;
+using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, Ploidy, VertexDataProp>;
 using VertexLabelProp = boost::property<boost::vertex_label_t, std::string, VertexPloidyProp>;
 using VertexProp = VertexLabelProp;
 
@@ -102,7 +92,7 @@ using JunctionTree = junction_tree::Graph;
 
 }
 
-struct xpotential_t {
+struct component_t {
     std::vector<relationship_graph::variable_t> variables;
     std::vector<float> edge_lengths;
 };
@@ -134,7 +124,7 @@ class GraphBuilder {
 
     relationship_graph::Graph CreateInitialGraph(const InheritanceModel &model, float mu);
 
-    struct component_t {
+    struct family_t {
         std::vector<member_id_t> members;
         std::vector<float> scales;
     };
@@ -150,13 +140,13 @@ class GraphBuilder {
     std::unordered_map<std::string, sample_id_t> map_sample_name_to_id_;
     std::vector<std::string> sample_names_;
 
-    std::vector<component_t> components_;
+    std::vector<family_t> families_;
 };
 
 
 mutk::relationship_graph::JunctionTree
 create_junction_tree(const mutk::relationship_graph::Graph &graph,
-    const std::vector<xpotential_t> &potentials,
+    const std::vector<component_t> &components,
     const std::vector<clique_t> &elimination_order);
 
 }

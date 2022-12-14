@@ -39,19 +39,19 @@ struct kalleles_test_mat {
 
     kalleles_test_mat(size_t n, float k) : Q(n+1,n+1) {
         using namespace boost::numeric::ublas;
-        // Build matrix
-        vector<float> freqs(n+1, 1.0/k);
-        freqs[n] = 1.0-n/k;
+        // Build Q matrix from Tuffley and Steel (1997)
+        vector<float> freqs(n+1, 1.0);
+        freqs[n] = k-n;
 
         for(int i=0; i<=n; ++i) {
             for(int j=0; j<=n; ++j) {
                 Q(i,j) = freqs[j];
             }
-            Q(i,i) = Q(i,i)-1.0;
+            Q(i,i) = Q(i,i)-k;
         }
 
         // Scale matrix into substitution time
-        Q *= k/(k-1);
+        Q *= 1.0/(k-1.0);
     }
 };
 
@@ -79,48 +79,48 @@ constexpr int ALLELE[][2] = {
     {0,2}, {1,2}, {2,2},
     {0,3}, {1,3}, {2,3}, {3,3},
     {0,4}, {1,4}, {2,4}, {3,4}, {4,4},
+    {0,5}, {1,5}, {2,5}, {3,5}, {4,5}, {5,5}
 };
 }
 
-using KAllelesModel = mutk::mutation::KAllelesModel;
-using potential_t = mutk::potential_t;
-using IndyId = mutk::IndyId;
+using mutk::MutationModel;
+using mutk::message_t;
 
 // LCOV_EXCL_START
-TEST_CASE("KAllelesModel-Constructor") {
-    CHECK_NOTHROW(KAllelesModel(4.0, 0.001, 0.0, 0.0, 0.0));
-    CHECK_THROWS_AS(KAllelesModel(1.0, 0.001, 0.0, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, -0.1, 0.0, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 1.1, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, -3000, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, 1.1, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, -4000, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, 0.0, 1.1), std::invalid_argument);
-    CHECK_THROWS_AS(KAllelesModel(4.0, 0.001, 0.0, 0.0, -3000), std::invalid_argument);
+TEST_CASE("MutationModel constructor works.") {
+    CHECK_NOTHROW(MutationModel(4.0, 0.001, 0.0, 0.0, 0.0));
+    CHECK_THROWS_AS(MutationModel(1.0, 0.001, 0.0, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, -0.1, 0.0, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 1.1, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, -3000, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 1.1, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, -4000, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 0.0, 1.1), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 0.0, -3000), std::invalid_argument);
 }
 // LCOV_EXCL_STOP
 
-// ret(i,j) = P(i|j)
-KAllelesModel::tensor_t KAllelesModel::CreateMatrix(size_t n, float t, any_t) const {
+// ret(i,j) = P(j|i)
+MutationModel::array_t MutationModel::CreateTransitionMatrix(message_size_t n, float_t t) const {
     assert(n > 0);
     assert(n <= 5);
 
-    double beta = t*k_/(k_-1.0);
-    double p_ji = -1.0/k_*expm1(-beta);
-    double p_jj = exp(-beta) + p_ji;
+    double beta = k_/(k_-1.0);
+    double p_ij = -1.0/k_*expm1(-beta*t);
+    double p_ii = exp(-beta*t) + p_ij;
 
-    tensor_t ret = tensor_t::from_shape({n,n});
+    array_t ret = array_t::from_shape({n,n});
 
-    for(size_t i = 0; i < n; ++i) {
-        for(size_t j = 0; j < n; ++j) {
-            ret(i,j) = (i == j) ? p_jj : p_ji;
+    for(message_size_t i = 0; i < n; ++i) {
+        for(message_size_t j = 0; j < n; ++j) {
+            ret(i,j) = (i == j) ? p_ii : p_ij;
         }
     }
     return ret;
 }
 
 // LCOV_EXCL_START
-TEST_CASE("KAllelesModel-CreateMatrix with any_t") {
+TEST_CASE("MutationModel::CreateTransitionMatrix() works.") {
     using namespace boost::numeric::ublas;
     
     auto test = [&](size_t n, float u, float k) {
@@ -128,7 +128,7 @@ TEST_CASE("KAllelesModel-CreateMatrix with any_t") {
         CAPTURE(k);
         CAPTURE(u);
 
-        KAllelesModel model(k, 0.001, 0, 0, 0);
+       MutationModel model(k, 0.001, 0, 0, 0);
 
         using mat_t = kalleles_test_mat::mat_t;
 
@@ -146,7 +146,7 @@ TEST_CASE("KAllelesModel-CreateMatrix with any_t") {
             f *= g;
             P += m * (t/f);
         }
-        auto obs = model.CreateMatrix(n, u, mutk::mutation::ANY);
+        auto obs = model.CreateTransitionMatrix(n, u);
         REQUIRE(obs.dimension() == 2);
         REQUIRE(obs.shape(0) == n);
         REQUIRE(obs.shape(1) == n);
@@ -162,113 +162,41 @@ TEST_CASE("KAllelesModel-CreateMatrix with any_t") {
 }
 // LCOV_EXCL_STOP
 
-// ret(i,j) = P(i & x mutations | j)
-KAllelesModel::tensor_t KAllelesModel::CreateMatrix(size_t n, float t, size_t x) const {
+// ret(i,j) = E[num of mutations | i,j]*P(j|i)
+//
+// If there are no events, the mean number of events is
+//     0
+// If there is one+ event, the mean number of events is
+//     beta*t/(1-exp(-beta*t))
+//
+// E[num of mutations] = E[num of events]/beta 
+//
+// E[ num events | i,j s.t. i==j ] = [1/k P(one+)]*[beta*t/ P(one+)]/(P(i==j))
+//   ==> E[ mutations | i,j]*P(i==j) = t/k
+// 
+// Similarly E[ mutations | i,j]*P(i != j) = t/k
+
+MutationModel::array_t MutationModel::CreateMeanMatrix(message_size_t n, float_t t) const {
     assert(n > 0);
     assert(n <= 5);
-    assert(x >= 0);
-    
-    double p_x;
-    if(t == 0.0) {
-        p_x = (x==0) ? 1.0 : 0.0;
-    } else {
-        p_x = exp(-t+x*log(t)-lgamma(x+1));
-    }
 
-    double p_ji = (1.0-pow(-1.0/(k_-1.0),x))/k_;
-    double p_jj = (1.0+(k_-1.0)*pow(-1.0/(k_-1.0),x))/k_;
+    double m = t/k_;
 
-    tensor_t ret = tensor_t::from_shape({n,n});
-
-    for(size_t i = 0; i < n; ++i) {
-        for(size_t j = 0; j < n; ++j) {
-            ret(i,j) = (i == j) ? p_x*p_jj : p_x*p_ji;
-        }
-    }
+    array_t ret = array_t({n,n}, m);
     return ret;
 }
 
 // LCOV_EXCL_START
-TEST_CASE("KAllelesModel-CreateMatrix with int") {
+TEST_CASE("MutationModel::CreateMeanMatrix() works.") {
     using namespace boost::numeric::ublas;
     
+    // TODO fix this test
     auto test = [&](size_t n, float u, float k) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
 
-        KAllelesModel model(k, 0.001, 0, 0, 0);
-
-        using mat_t = kalleles_test_mat::mat_t;
-
-        kalleles_test_mat mat(n,k);
-
-        mat_t P = identity_matrix<float>(n+1);
-        mat_t m = P;
-        mat_t J = mat.Q+m;
-        float t;
-        float f;
-        for(int x=0; x <= 10; ++x) {
-            CAPTURE(x);
-            if(x == 0) {
-                P = m*exp(-u);
-                f = 1.0;
-                t = 1.0;
-            } else {
-                mat_t a = prec_prod(m,J);
-                m = a;
-                t *= u;
-                f *= x;
-                P = m*(exp(-u)*t/f);
-            }
-            auto obs = model.CreateMatrix(n, u, x);
-            REQUIRE(obs.dimension() == 2);
-            REQUIRE(obs.shape(0) == n);
-            REQUIRE(obs.shape(1) == n);
-            for(int i=0; i < n; ++i) {
-                for(int j=0; j < n; ++j) {
-                    CAPTURE(i);
-                    CAPTURE(j);
-                    CHECK(obs(i,j) == doctest::Approx(P(i,j)));
-                }
-            }
-
-        }
-    };
-
-    run_mutation_tests(test);
-}
-// LCOV_EXCL_STOP
-
-// ret(i,j) = E[num of mutations | i,j]*P(i|j)
-KAllelesModel::tensor_t KAllelesModel::CreateMatrix(size_t n, float t, mean_t) const {
-    assert(n > 0);
-    assert(n <= 5);
-
-    double beta = k_*t/(k_-1.0);
-    double p_jj = -t/k_*expm1(-beta);
-    double p_ji = (t-p_jj)/(k_-1.0);
-
-    tensor_t ret = tensor_t::from_shape({n,n});
-
-    for(size_t i = 0; i < n; ++i) {
-        for(size_t j = 0; j < n; ++j) {
-            ret(i,j) = (i == j) ? p_jj : p_ji;
-        }
-    }
-    return ret;
-}
-
-// LCOV_EXCL_START
-TEST_CASE("KAllelesModel-CreateMatrix with mean_t") {
-    using namespace boost::numeric::ublas;
-    
-    auto test = [&](size_t n, float u, float k) {
-        CAPTURE(n);
-        CAPTURE(k);
-        CAPTURE(u);
-
-        KAllelesModel model(k, 0.001, 0, 0, 0);
+        MutationModel model(k, 0.001, 0, 0, 0);
 
         using mat_t = kalleles_test_mat::mat_t;
 
@@ -295,7 +223,7 @@ TEST_CASE("KAllelesModel-CreateMatrix with mean_t") {
                 S += P*x;
             }
         }
-        auto obs = model.CreateMatrix(n, u, mutk::mutation::MEAN);
+        auto obs = model.CreateMeanMatrix(n, u);
         REQUIRE(obs.dimension() == 2);
         REQUIRE(obs.shape(0) == n);
         REQUIRE(obs.shape(1) == n);
@@ -305,6 +233,92 @@ TEST_CASE("KAllelesModel-CreateMatrix with mean_t") {
                 CAPTURE(j);
                 CHECK(obs(i,j) == doctest::Approx(S(i,j)));
             }
+        }
+    };
+
+    run_mutation_tests(test);
+}
+// LCOV_EXCL_STOP
+
+// ret(i,j) = P(j & x mutations | i)
+//
+// beta = k/(k-1)
+// P(x mutations | i) = (t^x Exp[-t])/x!
+// 
+MutationModel::array_t MutationModel::CreateCountMatrix(message_size_t n, float_t t, int x) const {
+    assert(n > 0);
+    assert(n <= 5);
+    assert(x >= 0);
+    
+    double p_x;
+    if(t == 0.0) {
+        p_x = (x==0) ? 1.0 : 0.0;
+    } else {
+        p_x = exp(-t+x*log(t)-lgamma(x+1));
+    }
+
+    // Formula calculated using MatrixPower[] in Mathematica
+    // Can be proved using an induction proof.
+    double h = k_-1.0;
+    double a = pow(-1.0/h, x);
+    double p_ii = (1.0+h*a)/k_;
+    double p_ij = (1.0-a)/k_;
+
+    array_t ret = array_t::from_shape({n,n});
+
+    for(size_t i = 0; i < n; ++i) {
+        for(size_t j = 0; j < n; ++j) {
+            ret(i,j) = (i == j) ? p_x*p_ii : p_x*p_ij;
+        }
+    }
+    return ret;
+}
+
+// LCOV_EXCL_START
+TEST_CASE("MutationModel::CreateCountMatrix() works.") {
+    using namespace boost::numeric::ublas;
+    
+    auto test = [&](size_t n, float u, float k) {
+        CAPTURE(n);
+        CAPTURE(k);
+        CAPTURE(u);
+
+        MutationModel model(k, 0.001, 0, 0, 0);
+
+        using mat_t = kalleles_test_mat::mat_t;
+
+        kalleles_test_mat mat(n,k);
+
+        mat_t P = identity_matrix<float>(n+1);
+        mat_t m = P;
+        mat_t J = mat.Q+m;
+        float t;
+        float f;
+        for(int x=0; x <= 10; ++x) {
+            CAPTURE(x);
+            if(x == 0) {
+                P = m*exp(-u);
+                f = 1.0;
+                t = 1.0;
+            } else {
+                mat_t a = prec_prod(m,J);
+                m = a;
+                t *= u;
+                f *= x;
+                P = m*(exp(-u)*t/f);
+            }
+            auto obs = model.CreateCountMatrix(n, u, x);
+            REQUIRE(obs.dimension() == 2);
+            REQUIRE(obs.shape(0) == n);
+            REQUIRE(obs.shape(1) == n);
+            for(int i=0; i < n; ++i) {
+                for(int j=0; j < n; ++j) {
+                    CAPTURE(i);
+                    CAPTURE(j);
+                    CHECK(obs(i,j) == doctest::Approx(P(i,j)));
+                }
+            }
+
         }
     };
 
@@ -1377,20 +1391,6 @@ TEST_CASE("create_transition_child_selfing_haploid") {
     }
 }
 // LCOV_EXCL_STOP
-
-mutk::tensor_t create_unit_potential(size_t n, const potential_t &potential) {
-    assert(potential.type == mutk::PotentialType::Unit);
-    mutk::shape_t shape;
-    for(auto &&a : potential.axes) {
-        assert(a == 1 || a == 2);
-        if(a == 1) {
-            shape.push_back(mutk::dim_width<1>(n));
-        } else {
-            shape.push_back(mutk::dim_width<2>(n));
-        }
-    }
-    return xt::ones<mutk::float_t>(shape);
-}
 
 namespace mutk {
 template<typename Arg>

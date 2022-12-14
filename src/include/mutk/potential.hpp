@@ -26,7 +26,9 @@
 #define MUTK_POTENTIAL_HPP
 
 #include <vector>
-#include <boost/container/static_vector.hpp>
+
+#include "message.hpp"
+#include "mutation.hpp"
 
 namespace mutk {
 
@@ -47,27 +49,116 @@ enum struct PotentialType {
     ChildSelfingHaploid  // P(G1|H2,H2)
 };
 
-// A strongly-type individual id.
-// Use unitary + to do a static cast.
-enum struct IndyId : int {};
-constexpr auto operator+(IndyId id) {
-    return static_cast<std::underlying_type_t<IndyId>>(id);
+class Potential {
+ public:
+    using labels_t = message_labels_t;
+
+    Potential(labels_t labels) : labels_{std::move(labels)} {}
+
+    virtual ~Potential() = default;
+
+    enum struct any_t  : int {};
+    enum struct mean_t : int {};
+    enum struct some_t : int {};
+
+    virtual message_t Create(message_size_t n, any_t) = 0;
+    virtual message_t Create(message_size_t n, some_t) = 0;
+    virtual message_t Create(message_size_t n, mean_t) = 0;
+
+    static constexpr any_t ANY{0};
+    static constexpr mean_t MEAN{1};
+    static constexpr some_t ZERO{0};
+    static constexpr some_t ONE{1};
+    static constexpr some_t TWO{2};
+
+ protected:
+    labels_t labels_;
+};
+
+inline
+constexpr auto operator+(Potential::some_t value) {
+    return static_cast<std::underlying_type_t<Potential::some_t>>(value);
 }
 
-struct potential_t {
-    PotentialType type;
-    IndyId child;
-    using data_t = std::pair<IndyId,float>;
-    boost::container::static_vector<data_t, 2> parents;
-    std::vector<int> axes;
+class UnitPotential : public Potential {
+ public:
+    UnitPotential(labels_t labels) : Potential(std::move(labels)) { }
 
-    potential_t() = default;
-    potential_t(PotentialType type_arg, IndyId child_arg) : type{type_arg}, child{child_arg} {}
-    potential_t(PotentialType type_arg, IndyId child_arg, IndyId par1, float dist1) :
-        type{type_arg}, child{child_arg}, parents{{par1,dist1}} {}
-    potential_t(PotentialType type_arg, IndyId child_arg, IndyId par1, float dist1, IndyId par2, float dist2) :
-        type{type_arg}, child{child_arg}, parents{{par1,dist1},{par2,dist2}} {}
+    virtual message_t Create(message_size_t n, any_t) override;
+    virtual message_t Create(message_size_t n, some_t) override;
+    virtual message_t Create(message_size_t n, mean_t) override;
 };
+
+class MutationPotential : public Potential {
+ public:
+    MutationPotential(labels_t labels, const MutationModel & model) : Potential(std::move(labels)),
+        model_(model) { }
+
+ protected:
+    MutationModel model_;
+};
+
+template<Ploidy P, Ploidy C>
+class CloningPotential : public MutationPotential {
+ public:
+    CloningPotential(labels_t labels, const MutationModel & model,
+        float_t u) : MutationPotential(std::move(labels), model),
+        u_(u) { }
+
+    virtual message_t Create(message_size_t n, any_t val) override;
+    virtual message_t Create(message_size_t n, some_t) override;
+    virtual message_t Create(message_size_t n, mean_t) override;    
+
+ protected:
+    template<class Arg>
+    message_t DoCreate(message_size_t n, Arg);
+
+    inline auto MessageShape(message_size_t n) {
+        auto d1 = message_dimension_length(n, P);
+        auto d2 = message_dimension_length(n, C);
+        return std::array<message_size_t, 2>({d1, d2});
+    }
+
+    float_t u_;
+};
+
+class SelfingPotential : public MutationPotential {
+ public:
+    SelfingPotential(labels_t labels, const MutationModel & model,
+        float_t len_a, float_t len_b) : MutationPotential(std::move(labels), model),
+        len_a_(len_a), len_b_(len_a) { }
+
+    virtual message_t Create(message_size_t n, any_t) override;
+    virtual message_t Create(message_size_t n, some_t) override;
+    virtual message_t Create(message_size_t n, mean_t) override;    
+
+ protected:
+    float_t len_a_;
+    float_t len_b_;
+};
+
+// Possible Potentials:
+// 2 x 2 -> 2 (selfing)
+// 2 x 2 -> 1 (selfing)
+// 1 x 1 -> 2 (selfing)
+// 1 x 1 -> 1 (selfing)
+
+// 2 x 2 -> 2
+// 2 x 2 -> 1
+// 2 x 1 -> 2
+// 2 x 1 -> 2
+// 1 x 2 -> 2
+// 1 x 2 -> 1
+// 1 x 1 -> 2
+// 1 x 1 -> 1
+
+// CLONING
+// 2 -> 2
+// 2 -> 1
+// 1 -> 2
+// 1 -> 1
+
+
 
 } // namespace mutk
 

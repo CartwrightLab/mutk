@@ -1595,7 +1595,7 @@ void mutk::GeneralPeelingVertex::AddOutput(const std::vector<PeelingVertex::labe
     shape_t shape;
     for(size_t i=0; i < output_data_.shape.size(); ++i) {
         // if axis is missing in the output, add it to the list that needs to be removed.
-        if(output_data_.shape[i] == 0) {
+        if(output_data_.shape[i] == 0) {output_data_.shape
             shape.push_back(i);
         }
     }

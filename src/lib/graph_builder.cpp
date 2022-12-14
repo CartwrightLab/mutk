@@ -54,7 +54,7 @@ auto make_inv_vertex_range(typename G::vertex_descriptor v,  G &graph) {
 
 using mutk::member_id_t;
 
-using mutk::xpotential_t;
+using mutk::component_t;
 
 using mutk::clique_t;
 
@@ -64,8 +64,8 @@ simplify_graph(mutk::relationship_graph::Graph &graph);
 static std::vector<clique_t>
 triangulate_graph(const mutk::relationship_graph::Graph &graph);
 
-static std::vector<xpotential_t>
-calculate_potentials(const mutk::relationship_graph::Graph &graph);
+static std::vector<component_t>
+calculate_components(const mutk::relationship_graph::Graph &graph);
 
 // Convert `name` into a member id. If `name` is already registered, it
 // return the registered id number. Otherwise add `name` to the registry.
@@ -85,12 +85,14 @@ member_id_t mutk::GraphBuilder::LookupName(const std::string &name) {
     return id;
 }
 
+constexpr float CHILD_NAN = std::numeric_limits<float>::quiet_NaN();
+
 member_id_t mutk::GraphBuilder::AddSingle(const std::string &name, const std::string &sex,
         const std::vector<std::string> &sample_names) {
     auto child_id = LookupName(name);
     member_sexes_[+child_id] = sex;
     member_input_samples_[+child_id] = sample_names;
-    components_.push_back(component_t{{child_id}, {0.0f}});
+    families_.push_back(family_t{{child_id}, {CHILD_NAN}});
     return child_id;
 }
 
@@ -100,7 +102,7 @@ member_id_t mutk::GraphBuilder::AddPair(const std::string &name, const std::stri
     auto child_id = LookupName(name);
     member_sexes_[+child_id] = sex;
     member_input_samples_[+child_id] = sample_names;
-    components_.push_back(component_t{{child_id, parent_id}, {0.0f, mutation_scale}});
+    families_.push_back(family_t{{child_id, parent_id}, {CHILD_NAN, mutation_scale}});
     return child_id;
 }
 
@@ -113,8 +115,8 @@ member_id_t mutk::GraphBuilder::AddTrio(const std::string &name, const std::stri
     auto child_id = LookupName(name);
     member_sexes_[+child_id] = sex;
     member_input_samples_[+child_id] = sample_names;
-    components_.push_back(component_t{{child_id, parent_id_a, parent_id_b},
-        {0.0f, mutation_scale_a, mutation_scale_b}});
+    families_.push_back(family_t{{child_id, parent_id_a, parent_id_b},
+        {CHILD_NAN, mutation_scale_a, mutation_scale_b}});
     return child_id;
 }
 
@@ -134,7 +136,7 @@ void mutk::GraphBuilder::BuildGraph(const InheritanceModel &model, float mu) {
 
     auto graph = simplify_graph(initial_graph);
 
-    auto potentials = calculate_potentials(graph);
+    auto components = calculate_components(graph);
 
     auto cliques = triangulate_graph(graph);
 
@@ -179,27 +181,27 @@ mutk::relationship_graph::Graph mutk::GraphBuilder::CreateInitialGraph(const Inh
     }
 
     // Add edges
-    for(const auto & component : components_) {
+    for(const auto & family : families_) {
         // Lookup family structure in inheritance model
         std::vector<InheritanceModel::chromosome_type_t> pattern;
-        for(const auto & member : component.members) {
+        for(const auto & member : family.members) {
             pattern.push_back(member_types[+member]);
         }
         auto pattern_it = std::find_if(model.patterns_.begin(), model.patterns_.end(), [&](const auto &val){
             return pattern == val.pattern;
         });
         if(pattern_it == model.patterns_.end()) {
-            throw std::invalid_argument("Member " + member_names_[+component.members[0]] +
+            throw std::invalid_argument("Member " + member_names_[+family.members[0]] +
                 "has invalid family pattern.");
         }
 
         // Connect up all members of this component
-        auto child_id = component.members[0];
-        for(size_t j = 1; j < component.members.size(); ++j) {
-                member_id_t from = component.members[j];
-                if(!pattern_it->discard[j]) {
-                    add_edge(+from, +child_id, {mu*component.scales[j]}, graph);
-                }
+        auto child_id = family.members[0];
+        for(size_t j = 1; j < family.members.size(); ++j) {
+            member_id_t from = family.members[j];
+            if(!pattern_it->discard[j]) {
+                add_edge(+from, +child_id, {mu*family.scales[j]}, graph);
+            }
         }
     }
 
@@ -598,22 +600,22 @@ TEST_CASE("triangulate_graph() identifies cliques") {
 }
 // LCOV_EXCL_STOP
 
-std::vector<xpotential_t>
-calculate_potentials(const mutk::relationship_graph::Graph &graph) {
+std::vector<component_t>
+calculate_components(const mutk::relationship_graph::Graph &graph) {
     using mutk::relationship_graph::variable_t;
 
-    std::vector<xpotential_t> potentials;
+    std::vector<component_t> components;
 
     for(auto v : make_vertex_range(graph)) {
         {
             // Add a potential for this single node
-            auto & pot = potentials.emplace_back();
+            auto & pot = components.emplace_back();
             pot.variables.push_back(variable_t(v));
             pot.edge_lengths.push_back(0.0f);
         }
         if(in_degree(v,graph) > 0) {
             // Add a potential for this family
-            auto & pot = potentials.emplace_back();
+            auto & pot = components.emplace_back();
             pot.variables.push_back(variable_t(v));
             pot.edge_lengths.push_back(0.0f);
             for(auto e : boost::make_iterator_range(in_edges(v,graph))) {
@@ -623,5 +625,5 @@ calculate_potentials(const mutk::relationship_graph::Graph &graph) {
         }
     }
 
-    return potentials;
+    return components;
 }

@@ -1,5 +1,5 @@
 /*
-# Copyright (c) 2014-2020 Reed A. Cartwright <reed@cartwright.ht>
+# Copyright (c) 2022 Reed A. Cartwright <racartwright@gmail.com>
 #
 # This file is part of the Ultimate Source Code Project.
 #
@@ -25,83 +25,64 @@
 #ifndef MUTK_MUTATION_HPP
 #define MUTK_MUTATION_HPP
 
-#include <mutk/memory.hpp>
-#include <mutk/potential.hpp>
+#include <stdexcept>
 
-#include <boost/container/static_vector.hpp>
-#include <vector>
+#include "message.hpp"
 
 namespace mutk {
-namespace mutation {
-
-// Tags
-struct any_t {};
-struct mean_t {};
-
-constexpr any_t ANY = {};
-constexpr mean_t MEAN = {};
-
-class Model {
-public:
-    using tensor_t = mutk::tensor_t;
-
-    virtual tensor_t CreateMatrix(size_t n, float t, any_t) const = 0;
-    virtual tensor_t CreateMatrix(size_t n, float t, mean_t) const = 0;
-    virtual tensor_t CreateMatrix(size_t n, float t, size_t x) const = 0;
-
-    virtual tensor_t CreatePriorDiploid(size_t n) const = 0;
-    virtual tensor_t CreatePriorHaploid(size_t n) const = 0;
-
-    tensor_t CreatePotential(size_t n, const potential_t &potential, any_t);
-    tensor_t CreatePotential(size_t n, const potential_t &potential, mean_t);
-    tensor_t CreatePotential(size_t n, const potential_t &potential, size_t x);
-
-    virtual ~Model() = default;
-};
 
 // A k-alleles model. See Lewis 2001 and Tuffley and Steel 1997.
-class KAllelesModel : public Model {
+//
+// P(j|i) = 1/k * (1-exp(-beta*t)) + I(j == i)*exp(-beta*t)
+//    where beta = k/(k-1)
+//    expected number of mutations = t
+//    expected number of events = beta*t
+//
+//    1/k mutations are virtual and (k-1)/k are real
+//
+//    Given at least 1 event, the expected number of events is 
+//      (beta*t)/(1-exp(-beta*t))
+//
+//    And expected number of mutations is t/(1-exp(-beta*t))
+//
+class MutationModel {
 public:
-    using tensor_t = Model::tensor_t;
+    using array_t = mutk::message_t;
 
-    KAllelesModel(double k, double theta, double hom_bias, double het_bias, double hap_bias) : 
+    MutationModel(float_t k, float_t theta, float_t hom_bias, float_t het_bias, float_t hap_bias) : 
         k_{k}, theta_{theta}, hom_bias_{hom_bias}, het_bias_{het_bias}, hap_bias_{hap_bias} {
 
-        double e = theta/(k-1.0);
+        float_t e = theta/(k-1.0f);
 
-        if(k < 2.0) {
+        if(k < 2.0f) {
             throw std::invalid_argument("Invalid k parameter.");
         }
-        if(theta < 0) {
+        if(theta < 0.0f) {
             throw std::invalid_argument("Invalid theta parameter");
         }
-        if(hom_bias > 1.0 || hom_bias < -(2.0+e)/((k-1.0)*e)) {
+        if(hom_bias > 1.0f || hom_bias < -(2.0f+e)/((k-1.0f)*e)) {
             throw std::invalid_argument("Invalid hom_bias parameter.");
         }
-        if(het_bias > 1.0 || het_bias < -(2.0+2.0*e)/((k-2.0)*e)) {
+        if(het_bias > 1.0f || het_bias < -(2.0f+2.0f*e)/((k-2.0f)*e)) {
             throw std::invalid_argument("Invalid het_bias parameter.");
         }
-        if(hap_bias > 1.0 || hap_bias < -(1.0+e)/((k-1.0)*e)) {
+        if(hap_bias > 1.0f || hap_bias < -(1.0f+e)/((k-1.0f)*e)) {
             throw std::invalid_argument("Invalid hap_bias parameter.");
         }
     }
 
-    virtual tensor_t CreateMatrix(size_t n, float t, any_t) const override;
-    virtual tensor_t CreateMatrix(size_t n, float t, mean_t) const override;
-    virtual tensor_t CreateMatrix(size_t n, float t, size_t x) const override;
-
-    virtual tensor_t CreatePriorDiploid(size_t n) const override;
-    virtual tensor_t CreatePriorHaploid(size_t n) const override;
+    array_t CreateTransitionMatrix(message_size_t n, float_t t) const;
+    array_t CreateMeanMatrix(message_size_t n, float_t t) const;
+    array_t CreateCountMatrix(message_size_t n, float_t t, int x) const;
 
 protected:
-    double k_;
-    double theta_;
-    double hom_bias_;
-    double het_bias_;
-    double hap_bias_;
+    float_t k_;
+    float_t theta_;
+    float_t hom_bias_;
+    float_t het_bias_;
+    float_t hap_bias_;
 };
 
-} // namespace mutation
 } // namespace mutk
 
 #endif // MUTK_MUTATION_HPP
