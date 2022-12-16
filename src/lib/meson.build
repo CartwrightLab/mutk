@@ -4,10 +4,11 @@ libmutk_sources = files([
   'pedigree.cpp',
   'utility.cpp',
   'newick.cpp',
-  'relationship_graph.cpp',
   'mutation.cpp',
   'graph_builder.cpp',
-  'junction_tree.cpp'
+  'junction_tree.cpp',
+  'potential.cpp',
+  'potential_cloning.cpp'
 ])
 
 libmutk_deps = [boost_dep, doctest_dep, eigen_dep, xtensor_dep, xblas_dep]

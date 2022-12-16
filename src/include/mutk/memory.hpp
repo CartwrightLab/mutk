@@ -25,6 +25,8 @@
 #ifndef MUTK_MEMORY_HPP
 #define MUTK_MEMORY_HPP
 
+#include "message.hpp"
+
 #include <cstdint>
 #include <cfloat>
 #include <algorithm>
@@ -41,11 +43,6 @@ using float_t = float;
 using tensor_t = xt::xarray<float_t>;
 using shape_t = tensor_t::shape_type;
 using strides_t = tensor_t::strides_type;
-
-inline
-constexpr tensor_t::size_type num_diploids(tensor_t::size_type n) {
-    return n*(n+1)/2;
-}
 
 template<int N>
 constexpr tensor_t::size_type dim_width(tensor_t::size_type n) {

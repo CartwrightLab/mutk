@@ -21,56 +21,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 */
-#include <doctest/doctest.h>
+#include "unit_testing.hpp"
+#include "mutation_testing.hpp"
 
 #include <mutk/mutation.hpp>
 #include <mutk/relationship_graph.hpp>
-
-// Libraries needed for testing
-#include <boost/numeric/ublas/matrix.hpp>
-
-namespace {
-// Structure useful for unit testing
-struct kalleles_test_mat {
-    using mat_t = boost::numeric::ublas::matrix<float,
-        boost::numeric::ublas::column_major,std::vector<float>>;
-
-    mat_t Q;
-
-    kalleles_test_mat(size_t n, float k) : Q(n+1,n+1) {
-        using namespace boost::numeric::ublas;
-        // Build Q matrix from Tuffley and Steel (1997)
-        vector<float> freqs(n+1, 1.0);
-        freqs[n] = k-n;
-
-        for(int i=0; i<=n; ++i) {
-            for(int j=0; j<=n; ++j) {
-                Q(i,j) = freqs[j];
-            }
-            Q(i,i) = Q(i,i)-k;
-        }
-
-        // Scale matrix into substitution time
-        Q *= 1.0/(k-1.0);
-    }
-};
-
-template<typename F>
-void run_mutation_tests(F test) {
-    test(2, 0.0,  4.0);
-    test(4, 0.0,  4.0);
-
-    test(1, 1e-8, 4.0);
-    test(2, 1e-8, 4.0);
-    test(3, 1e-8, 4.0);
-    test(4, 1e-8, 4.0);
-    
-    test(4, 1e-8, 4.0);
-    test(4, 1e-9, 5.0);
-    test(4, 1e-6, 6.0);
-    test(4, 1e-3, 7.0);
-}
-} // anon namespace
 
 namespace {
 constexpr int ALLELE[][2] = {
@@ -85,20 +40,6 @@ constexpr int ALLELE[][2] = {
 
 using mutk::MutationModel;
 using mutk::message_t;
-
-// LCOV_EXCL_START
-TEST_CASE("MutationModel constructor works.") {
-    CHECK_NOTHROW(MutationModel(4.0, 0.001, 0.0, 0.0, 0.0));
-    CHECK_THROWS_AS(MutationModel(1.0, 0.001, 0.0, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, -0.1, 0.0, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 1.1, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, 0.001, -3000, 0.0, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 1.1, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, -4000, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 0.0, 1.1), std::invalid_argument);
-    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 0.0, -3000), std::invalid_argument);
-}
-// LCOV_EXCL_STOP
 
 // ret(i,j) = P(j|i)
 MutationModel::array_t MutationModel::CreateTransitionMatrix(message_size_t n, float_t t) const {
@@ -119,126 +60,29 @@ MutationModel::array_t MutationModel::CreateTransitionMatrix(message_size_t n, f
     return ret;
 }
 
-// LCOV_EXCL_START
-TEST_CASE("MutationModel::CreateTransitionMatrix() works.") {
-    using namespace boost::numeric::ublas;
-    
-    auto test = [&](size_t n, float u, float k) {
-        CAPTURE(n);
-        CAPTURE(k);
-        CAPTURE(u);
 
-       MutationModel model(k, 0.001, 0, 0, 0);
-
-        using mat_t = kalleles_test_mat::mat_t;
-
-        kalleles_test_mat mat(n,k);
-
-        mat_t P = identity_matrix<float>(n+1);
-        mat_t m = P;
-        float t = 1.0;
-        float f = 1.0;
-        // Use the first 11 elements of the expm series 
-        for(int g=1;g <= 11; ++g) {
-            mat_t a = prec_prod(m,mat.Q);
-            m = a;
-            t *= u;
-            f *= g;
-            P += m * (t/f);
-        }
-        auto obs = model.CreateTransitionMatrix(n, u);
-        REQUIRE(obs.dimension() == 2);
-        REQUIRE(obs.shape(0) == n);
-        REQUIRE(obs.shape(1) == n);
-        for(int i=0; i < n; ++i) {
-            for(int j=0; j < n; ++j) {
-                CAPTURE(i);
-                CAPTURE(j);
-                CHECK(obs(i,j) == doctest::Approx(P(i,j)));
-            }
-        }
-    };
-    run_mutation_tests(test);
-}
-// LCOV_EXCL_STOP
 
 // ret(i,j) = E[num of mutations | i,j]*P(j|i)
-//
-// If there are no events, the mean number of events is
-//     0
-// If there is one+ event, the mean number of events is
-//     beta*t/(1-exp(-beta*t))
-//
-// E[num of mutations] = E[num of events]/beta 
-//
-// E[ num events | i,j s.t. i==j ] = [1/k P(one+)]*[beta*t/ P(one+)]/(P(i==j))
-//   ==> E[ mutations | i,j]*P(i==j) = t/k
-// 
-// Similarly E[ mutations | i,j]*P(i != j) = t/k
-
+// Estimated via Mathematica
 MutationModel::array_t MutationModel::CreateMeanMatrix(message_size_t n, float_t t) const {
     assert(n > 0);
     assert(n <= 5);
 
-    double m = t/k_;
+    double beta = k_/(k_-1.0);
+    double p = -expm1(-beta*t);
 
-    array_t ret = array_t({n,n}, m);
+    double p_ii = p * t/k_;
+    double p_ij = (k_-p)/(k_-1.0) * t/k_;
+
+    array_t ret = array_t::from_shape({n,n});
+
+    for(message_size_t i = 0; i < n; ++i) {
+        for(message_size_t j = 0; j < n; ++j) {
+            ret(i,j) = (i == j) ? p_ii : p_ij;
+        }
+    }
     return ret;
 }
-
-// LCOV_EXCL_START
-TEST_CASE("MutationModel::CreateMeanMatrix() works.") {
-    using namespace boost::numeric::ublas;
-    
-    // TODO fix this test
-    auto test = [&](size_t n, float u, float k) {
-        CAPTURE(n);
-        CAPTURE(k);
-        CAPTURE(u);
-
-        MutationModel model(k, 0.001, 0, 0, 0);
-
-        using mat_t = kalleles_test_mat::mat_t;
-
-        kalleles_test_mat mat(n,k);
-
-        mat_t P = identity_matrix<float>(n+1);
-        mat_t m = P;
-        mat_t J = mat.Q+m;
-        mat_t S;
-        float t;
-        float f;
-        for(int x=0; x <= 10; ++x) {
-            if(x == 0) {
-                P = m*exp(-u);
-                S = P*x;
-                f = 1.0;
-                t = 1.0;
-            } else {
-                mat_t a = prec_prod(m,J);
-                m = a;
-                t *= u;
-                f *= x;
-                P = m*(exp(-u)*t/f);
-                S += P*x;
-            }
-        }
-        auto obs = model.CreateMeanMatrix(n, u);
-        REQUIRE(obs.dimension() == 2);
-        REQUIRE(obs.shape(0) == n);
-        REQUIRE(obs.shape(1) == n);
-        for(int i=0; i < n; ++i) {
-            for(int j=0; j < n; ++j) {
-                CAPTURE(i);
-                CAPTURE(j);
-                CHECK(obs(i,j) == doctest::Approx(S(i,j)));
-            }
-        }
-    };
-
-    run_mutation_tests(test);
-}
-// LCOV_EXCL_STOP
 
 // ret(i,j) = P(j & x mutations | i)
 //
@@ -249,14 +93,9 @@ MutationModel::array_t MutationModel::CreateCountMatrix(message_size_t n, float_
     assert(n > 0);
     assert(n <= 5);
     assert(x >= 0);
+    double xlogt = (x == 0 && t == 0.0) ? 0.0 : x*log(t);
+    double p_x = exp(-t+xlogt-lgamma(x+1));
     
-    double p_x;
-    if(t == 0.0) {
-        p_x = (x==0) ? 1.0 : 0.0;
-    } else {
-        p_x = exp(-t+x*log(t)-lgamma(x+1));
-    }
-
     // Formula calculated using MatrixPower[] in Mathematica
     // Can be proved using an induction proof.
     double h = k_-1.0;
@@ -275,9 +114,64 @@ MutationModel::array_t MutationModel::CreateCountMatrix(message_size_t n, float_
 }
 
 // LCOV_EXCL_START
-TEST_CASE("MutationModel::CreateCountMatrix() works.") {
+TEST_CASE("MutationModel.Constructor") {
+    CHECK_NOTHROW(MutationModel(4.0, 0.001, 0.0, 0.0, 0.0));
+    CHECK_THROWS_AS(MutationModel(1.0, 0.001, 0.0, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, -0.1, 0.0, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 1.1, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, -3000, 0.0, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 1.1, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, -4000, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 0.0, 1.1), std::invalid_argument);
+    CHECK_THROWS_AS(MutationModel(4.0, 0.001, 0.0, 0.0, -3000), std::invalid_argument);
+}
+// LCOV_EXCL_STOP
+
+// LCOV_EXCL_START
+TEST_CASE("MutationModel.CreateTransitionMatrix") {
     using namespace boost::numeric::ublas;
     
+    auto test = [&](size_t n, float u, float k) {
+        CAPTURE(n);
+        CAPTURE(k);
+        CAPTURE(u);
+
+       MutationModel model(k, 0.001, 0, 0, 0);
+
+        using mat_t = kalleles_test_mat::mat_t;
+
+        kalleles_test_mat mat(n,k);
+
+        mat_t P = identity_matrix<float>(n+1);
+        mat_t m = P;
+        float t = 1.0;
+        // Use the first 11 elements of the expm series 
+        for(int g=1;g <= 11; ++g) {
+            mat_t a = prec_prod(m,mat.Q);
+            m = a;
+            t *= (u/g);
+            P += m * t;
+        }
+        auto obs = model.CreateTransitionMatrix(n, u);
+        REQUIRE(obs.dimension() == 2);
+        REQUIRE(obs.shape(0) == n);
+        REQUIRE(obs.shape(1) == n);
+        for(size_t i=0; i < n; ++i) {
+            for(size_t j=0; j < n; ++j) {
+                INFO("Transition: ", i, " -> ", j);
+                CHECK(obs(i,j) == doctest::Approx(P(i,j)));
+            }
+        }
+    };
+    run_mutation_tests(test);
+}
+// LCOV_EXCL_STOP
+
+// LCOV_EXCL_START
+TEST_CASE("MutationModel.CreateMeanMatrix") {
+    using namespace boost::numeric::ublas;
+    
+    // TODO fix this test
     auto test = [&](size_t n, float u, float k) {
         CAPTURE(n);
         CAPTURE(k);
@@ -289,30 +183,72 @@ TEST_CASE("MutationModel::CreateCountMatrix() works.") {
 
         kalleles_test_mat mat(n,k);
 
+        // First 11 elements of Poisson:
+        // u^x*exp(-u)/x!
+        // m = (Q+I)^x
+        mat_t m = identity_matrix<float>(n+1);
+        mat_t J = mat.Q+m;
+        float t = exp(-u);
+        mat_t P = m*t;
+        mat_t S = P*0.0;
+        for(int x=1; x <= 10; ++x) {
+            mat_t a = prec_prod(J,m);
+            m = a;
+            t *= u/x;
+            P = m*t;
+            S += P*x;
+        }
+        auto obs = model.CreateMeanMatrix(n, u);
+        REQUIRE(obs.dimension() == 2);
+        REQUIRE(obs.shape(0) == n);
+        REQUIRE(obs.shape(1) == n);
+        for(size_t i=0; i < n; ++i) {
+            for(size_t j=0; j < n; ++j) {
+                INFO("Transition: ", i, " -> ", j);
+                CHECK(obs(i,j) == doctest::Approx(S(i,j)));
+            }
+        }
+    };
+
+    run_mutation_tests(test);
+}
+// LCOV_EXCL_STOP
+
+// LCOV_EXCL_START
+TEST_CASE("MutationModel.CreateCountMatrix") {
+    using namespace boost::numeric::ublas;
+    
+    auto test = [&](size_t n, float u, float k) {
+        CAPTURE(n); CAPTURE(k); CAPTURE(u);
+
+        MutationModel model(k, 0.001, 0, 0, 0);
+
+        using mat_t = kalleles_test_mat::mat_t;
+
+        kalleles_test_mat mat(n,k);
+
         mat_t P = identity_matrix<float>(n+1);
         mat_t m = P;
         mat_t J = mat.Q+m;
         float t;
-        float f;
         for(int x=0; x <= 10; ++x) {
             CAPTURE(x);
             if(x == 0) {
                 P = m*exp(-u);
-                f = 1.0;
                 t = 1.0;
             } else {
-                mat_t a = prec_prod(m,J);
+                mat_t a = prec_prod(J,m);
                 m = a;
-                t *= u;
-                f *= x;
-                P = m*(exp(-u)*t/f);
+                t *= (u/x);
+                P = m*(exp(-u)*t);
             }
             auto obs = model.CreateCountMatrix(n, u, x);
             REQUIRE(obs.dimension() == 2);
             REQUIRE(obs.shape(0) == n);
             REQUIRE(obs.shape(1) == n);
-            for(int i=0; i < n; ++i) {
-                for(int j=0; j < n; ++j) {
+            for(size_t i=0; i < n; ++i) {
+                for(size_t j=0; j < n; ++j) {
+                    INFO("Transition: ", i, " -> ", j);
                     CAPTURE(i);
                     CAPTURE(j);
                     CHECK(obs(i,j) == doctest::Approx(P(i,j)));
@@ -325,6 +261,8 @@ TEST_CASE("MutationModel::CreateCountMatrix() works.") {
     run_mutation_tests(test);
 }
 // LCOV_EXCL_STOP
+
+#if 0
 
 KAllelesModel::tensor_t KAllelesModel::CreatePriorHaploid(size_t n) const {
     double k = k_;
@@ -670,177 +608,6 @@ mutk::tensor_t create_transition_clone_diploid(const mutk::mutation::Model &mode
     return xt::transpose(ret, potential.axes);
 }
 
-// LCOV_EXCL_START
-TEST_CASE("create_transition_clone_diploid") {
-    SUBCASE("Passing mutk::mutation::ANY as argument.") {
-        auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
-            CAPTURE(n);
-            CAPTURE(k);
-            CAPTURE(u);
-
-            potential_t pot{mutk::PotentialType::CloneDiploid, IndyId(0), IndyId(1), u};
-            pot.axes = axes;
-            KAllelesModel model{k, 0.001, 0, 0, 0};
-            auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::ANY);
-
-            auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
-
-            REQUIRE(obs.dimension() == 2);
-            mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
-            REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
-            REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
-            for(int a1=0,a=0;a1<n;++a1) {
-                for(int a2=0;a2<=a1;++a2,++a) {
-                    for(int b1=0,b=0;b1<n;++b1) {
-                        for(int b2=0;b2<=b1;++b2,++b) {
-                            CAPTURE(a1);
-                            CAPTURE(a2);
-                            CAPTURE(a);
-                            CAPTURE(b1);
-                            CAPTURE(b2);
-                            CAPTURE(b);
-                            // b1/b2 -> a1/a2
-                            float expected = mat(a1,b1)*mat(a2,b2);
-                            if(a1 != a2) {
-                                expected += mat(a2,b1)*mat(a1,b2);
-                            }
-                            std::array<int, 2> indexes = {a,b};
-                            int o1 = indexes[pot.axes[0]];
-                            int o2 = indexes[pot.axes[1]];
-                            CHECK(obs(o1,o2) == doctest::Approx(expected));
-                        }
-                    }
-                }
-            }
-        };
-        SUBCASE("Axes are {0, 1}.") {
-            auto subtest = [&](size_t n, float u, float k) {
-                return test(n, u, k, {0,1});
-            };
-            run_mutation_tests(subtest);
-        }
-        SUBCASE("Axes are {1, 0}.") {
-            auto subtest = [&](size_t n, float u, float k) {
-                return test(n, u, k, {1,0});
-            };
-            run_mutation_tests(subtest);
-        }
-    }
-    SUBCASE("Passing mutk::mutation::MEAN as argument.") {
-        auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
-            CAPTURE(n);
-            CAPTURE(k);
-            CAPTURE(u);
-
-            potential_t pot{mutk::PotentialType::CloneDiploid, IndyId(0), IndyId(1), u};
-            pot.axes = axes;
-            KAllelesModel model{k, 0.001, 0, 0, 0};
-            auto obs = create_transition_clone_diploid(model, n, pot, mutk::mutation::MEAN);
-
-            auto mat1 = model.CreateMatrix(n, u, mutk::mutation::MEAN);
-            auto mat2 = model.CreateMatrix(n, u, mutk::mutation::ANY);
-
-            REQUIRE(obs.dimension() == 2);
-            mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
-            REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
-            REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
-            for(int a1=0,a=0;a1<n;++a1) {
-                for(int a2=0;a2<=a1;++a2,++a) {
-                    for(int b1=0,b=0;b1<n;++b1) {
-                        for(int b2=0;b2<=b1;++b2,++b) {
-                            CAPTURE(a1);
-                            CAPTURE(a2);
-                            CAPTURE(a);
-                            CAPTURE(b1);
-                            CAPTURE(b2);
-                            CAPTURE(b);
-                            // b1/b2 -> a1/a2
-                            float expected = mat1(a1,b1)*mat2(a2,b2) + mat2(a1,b1)*mat1(a2,b2);
-                            if(a1 != a2) {
-                                expected += mat1(a2,b1)*mat2(a1,b2) + mat2(a2,b1)*mat1(a1,b2);
-                            }
-                            std::array<int, 2> indexes = {a,b};
-                            int o1 = indexes[pot.axes[0]];
-                            int o2 = indexes[pot.axes[1]];
-                            CHECK(obs(o1,o2) == doctest::Approx(expected));
-                        }
-                    }
-                }
-            }
-        };
-        SUBCASE("Axes are {0, 1}.") {
-            auto subtest = [&](size_t n, float u, float k) {
-                return test(n, u, k, {0,1});
-            };
-            run_mutation_tests(subtest);
-        }
-        SUBCASE("Axes are {1, 0}.") {
-            auto subtest = [&](size_t n, float u, float k) {
-                return test(n, u, k, {1,0});
-            };
-            run_mutation_tests(subtest);
-        }
-    }
-    SUBCASE("Passing an integer as argument.") {
-        auto test = [&](size_t n, float u, float k, std::vector<int> axes, int val) {
-            CAPTURE(n);
-            CAPTURE(k);
-            CAPTURE(u);
-
-            potential_t pot{mutk::PotentialType::CloneDiploid, IndyId(0), IndyId(1), u};
-            pot.axes = axes;
-            KAllelesModel model{k, 0.001, 0, 0, 0};
-            auto obs = create_transition_clone_diploid(model, n, pot, val);
-
-            REQUIRE(obs.dimension() == 2);
-            mutk::shape_t pot_shape = {n*(n+1)/2, n*(n+1)/2};
-            REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
-            REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
-            for(int a1=0,a=0;a1<n;++a1) {
-                for(int a2=0;a2<=a1;++a2,++a) {
-                    for(int b1=0,b=0;b1<n;++b1) {
-                        for(int b2=0;b2<=b1;++b2,++b) {
-                            CAPTURE(a1);
-                            CAPTURE(a2);
-                            CAPTURE(a);
-                            CAPTURE(b1);
-                            CAPTURE(b2);
-                            CAPTURE(b);
-                            // b1/b2 -> a1/a2
-                            float expected = 0.0;
-                            for(int i=0;i<=val;++i) {           
-                                auto mat1 = model.CreateMatrix(n, u, i);
-                                auto mat2 = model.CreateMatrix(n, u, val-i);
-                                expected += mat1(a1,b1)*mat2(a2,b2);
-                                if(a1 != a2) {
-                                    expected += mat1(a2,b1)*mat2(a1,b2);
-                                }
-                            }
-                            std::array<int, 2> indexes = {a,b};
-                            int o1 = indexes[pot.axes[0]];
-                            int o2 = indexes[pot.axes[1]];
-                            CHECK(obs(o1,o2) == doctest::Approx(expected));
-                        }
-                    }
-                }
-            }
-        };
-        SUBCASE("Axes are {0, 1}. Integer is 0.") {
-            auto subtest = [&](size_t n, float u, float k) {
-                return test(n, u, k, {0,1}, 0);
-            };
-            run_mutation_tests(subtest);
-        }
-        SUBCASE("Axes are {1, 0}. Integer is 1.") {
-            auto subtest = [&](size_t n, float u, float k) {
-                return test(n, u, k, {1,0}, 1);
-            };
-            run_mutation_tests(subtest);
-        }
-    }
-}
-// LCOV_EXCL_STOP
-
 template<typename Arg>
 mutk::tensor_t create_transition_clone_haploid(const mutk::mutation::Model &model, 
     size_t n, const potential_t &potential, Arg arg) {
@@ -850,51 +617,6 @@ mutk::tensor_t create_transition_clone_haploid(const mutk::mutation::Model &mode
     return xt::transpose(ret, potential.axes);
 }
 
-// LCOV_EXCL_START
-TEST_CASE("create_transition_clone_haploid") {
-    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
-        CAPTURE(n);
-        CAPTURE(k);
-        CAPTURE(u);
-
-        potential_t pot{mutk::PotentialType::CloneHaploid, IndyId(0), IndyId(1), u};
-        pot.axes = axes;
-        KAllelesModel model{k, 0.001, 0, 0, 0};
-        auto obs = create_transition_clone_haploid(model, n, pot, mutk::mutation::ANY);
-
-        auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
-        REQUIRE(obs.dimension() == 2);
-        mutk::shape_t pot_shape = {n,n};
-        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
-        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
-        for(int a=0;a<n;++a) {
-            for(int b=0;b<n;++b) {
-                CAPTURE(a);
-                CAPTURE(b);
-                // b -> a
-                float expected = mat(a,b);
-                std::array<int, 2> indexes = {a,b};
-                int o1 = indexes[pot.axes[0]];
-                int o2 = indexes[pot.axes[1]];
-                CHECK(obs(o1,o2) == doctest::Approx(expected));
-            }
-        }
-    };
-    SUBCASE("Axes are {0, 1}.") {
-        auto subtest = [&](size_t n, float u, float k) {
-            return test(n, u, k, {0,1});
-        };
-        run_mutation_tests(subtest);
-    }
-    SUBCASE("Axes are {1, 0}.") {
-        auto subtest = [&](size_t n, float u, float k) {
-            return test(n, u, k, {1,0});
-        };
-        run_mutation_tests(subtest);
-    }
-}
-// LCOV_EXCL_STOP
-
 template<typename Arg>
 mutk::tensor_t create_transition_gamete_diploid(const mutk::mutation::Model &model, 
     size_t n, const potential_t &potential, Arg arg) {
@@ -902,55 +624,6 @@ mutk::tensor_t create_transition_gamete_diploid(const mutk::mutation::Model &mod
     auto ret = create_transition_haploid_impl<2>(model, n, potential.parents[0].second, arg);
     return xt::transpose(ret, potential.axes);
 }
-
-// LCOV_EXCL_START
-TEST_CASE("create_transition_gamete_diploid") {
-    auto test = [&](size_t n, float u, float k, std::vector<int> axes) {
-        CAPTURE(n);
-        CAPTURE(k);
-        CAPTURE(u);
-
-        potential_t pot{mutk::PotentialType::GameteDiploid, IndyId(0), IndyId(1), u};
-        pot.axes = axes;
-        KAllelesModel model(k, 0.001, 0, 0, 0);
-
-        auto obs = create_transition_gamete_diploid(model, n, pot, mutk::mutation::ANY);
-        auto mat = model.CreateMatrix(n, u, mutk::mutation::ANY);
-        REQUIRE(obs.dimension() == 2);
-        mutk::shape_t pot_shape = {n, n*(n+1)/2};
-        REQUIRE(obs.shape(0) == pot_shape[pot.axes[0]]);
-        REQUIRE(obs.shape(1) == pot_shape[pot.axes[1]]);
-        for(int a=0;a<n;++a) {
-            for(int b1=0,b=0;b1<n;++b1) {
-                for(int b2=0;b2<=b1;++b2,++b) {
-                    CAPTURE(a);
-                    CAPTURE(b);
-                    CAPTURE(b1);
-                    CAPTURE(b2);
-                    // b1/b2 -> a
-                    float expected = 0.5*mat(a,b1) + 0.5*mat(a,b2);
-                    std::array<int, 2> indexes = {a,b};
-                    int o1 = indexes[pot.axes[0]];
-                    int o2 = indexes[pot.axes[1]];
-                    CHECK(obs(o1,o2) == doctest::Approx(expected));
-                }
-            }
-        }
-    };
-    SUBCASE("Axes are {0, 1}.") {
-        auto subtest = [&](size_t n, float u, float k) {
-            return test(n, u, k, {0,1});
-        };
-        run_mutation_tests(subtest);
-    }
-    SUBCASE("Axes are {1, 0}.") {
-        auto subtest = [&](size_t n, float u, float k) {
-            return test(n, u, k, {1,0});
-        };
-        run_mutation_tests(subtest);
-    }
-}
-// LCOV_EXCL_STOP
 
 template<typename Arg>
 mutk::tensor_t create_transition_child_diploid_diploid(const mutk::mutation::Model &model, 
@@ -1442,3 +1115,5 @@ mutk::tensor_t mutk::mutation::Model::CreatePotential(size_t n, const potential_
 mutk::tensor_t mutk::mutation::Model::CreatePotential(size_t n, const potential_t &potential, size_t arg) {
     return create_mutation_potential(*this, n, potential, arg);
 }
+
+#endif

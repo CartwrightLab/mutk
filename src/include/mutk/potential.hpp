@@ -158,7 +158,20 @@ class SelfingPotential : public MutationPotential {
 // 1 -> 2
 // 1 -> 1
 
+template<Ploidy A, Ploidy B>
+message_t CloningPotential<A,B>::Create(size_t n, any_t a) {
+    return DoCreate(n, a);
+}
 
+template<Ploidy A, Ploidy B>
+message_t CloningPotential<A,B>::Create(size_t n, mean_t a) {
+    return DoCreate(n, a);
+}
+
+template<Ploidy A, Ploidy B>
+message_t CloningPotential<A,B>::Create(size_t n, some_t a) {
+    return DoCreate(n, a);
+}
 
 } // namespace mutk
 

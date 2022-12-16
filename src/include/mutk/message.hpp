@@ -92,6 +92,7 @@ constexpr message_size_t message_dimension_length(message_size_t n, Ploidy h) {
      case Ploidy::Diploid:
         return num_diploids(n);
     };
+    return 0;
 }
 
 inline

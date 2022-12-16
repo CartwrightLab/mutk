@@ -31,6 +31,8 @@
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/graph/topological_sort.hpp>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
 
 #include "mutk/graph_builder.hpp"
 
@@ -154,8 +156,6 @@ mutk::relationship_graph::JunctionTree
 mutk::create_junction_tree(const mutk::relationship_graph::Graph &graph,
     const std::vector<component_t> &potentials,
     const std::vector<clique_t> &elimination_order) {
-
-    using mutk::relationship_graph::variable_t;
 
     // a 'variable' is a vertex in the relationship graph.
     // a 'rank' is the position of the variable in the elimination order
@@ -337,7 +337,7 @@ mutk::create_junction_tree(const mutk::relationship_graph::Graph &graph,
 TEST_CASE("create_junction_tree() constructs a junction tree.") {
     using mutk::relationship_graph::Graph;
     using mutk::relationship_graph::JunctionTree;
-    using mutk::relationship_graph::variable_t;
+    using mutk::variable_t;
 
     auto mkpot = [](const std::initializer_list<int> & range) -> component_t {
         std::vector<variable_t> ret;

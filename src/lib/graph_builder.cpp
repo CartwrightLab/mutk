@@ -167,7 +167,7 @@ mutk::relationship_graph::Graph mutk::GraphBuilder::CreateInitialGraph(const Inh
         member_types.push_back(it->second);
 
         // Set ploidy
-        ploidies[i] = mutk::relationship_graph::VertexPloidy{model.ploidies_[+it->second]};
+        ploidies[i] = mutk::Ploidy{model.ploidies_[+it->second]};
 
         // Identify samples
         auto & member_data = member_data_samples_.emplace_back();
@@ -602,7 +602,7 @@ TEST_CASE("triangulate_graph() identifies cliques") {
 
 std::vector<component_t>
 calculate_components(const mutk::relationship_graph::Graph &graph) {
-    using mutk::relationship_graph::variable_t;
+    using mutk::variable_t;
 
     std::vector<component_t> components;
 

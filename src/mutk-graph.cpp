@@ -61,28 +61,28 @@ int main(int argc, char *argv[]) {
     ADD_OPTION_(mu, "Germline mutation rate");
 
     ADD_OPTION_(ped, "Pedigree file");
-    ADD_OPTION_(chr_model, "Chromosomal inheritance model")
-        ->transform(CLI::CheckedTransformer(mutk::detail::CHR_MODEL_MAP, CLI::ignore_case));
+    // ADD_OPTION_(chr_model, "Chromosomal inheritance model")
+    //     ->transform(CLI::CheckedTransformer(mutk::detail::CHR_MODEL_MAP, CLI::ignore_case));
 
     app.add_option("input", args.input, "Input file");
     #undef ADD_OPTION_
 
     CLI11_PARSE(app, argc, argv);
 
-    mutk::vcf::Reader reader{args.input};
+    // mutk::vcf::Reader reader{args.input};
 
-    auto samples = reader.samples();
+    // auto samples = reader.samples();
 
-    std::vector<const char*> known_samples(samples.first, samples.first+samples.second);
+    // std::vector<const char*> known_samples(samples.first, samples.first+samples.second);
 
-    auto pedigree = mutk::Pedigree::parse_file(args.ped);
+    // auto pedigree = mutk::Pedigree::parse_file(args.ped);
 
-    mutk::RelationshipGraph graph;
-    graph.ConstructGraph(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
+    // mutk::RelationshipGraph graph;
+    // graph.ConstructGraph(pedigree, known_samples, args.chr_model, args.mu, args.mu, false);
 
-    graph.ConstructPeeler();
+    // graph.ConstructPeeler();
 
-    graph.PrintGraph(std::cout);
+    // graph.PrintGraph(std::cout);
 
     return EXIT_SUCCESS;
 }

@@ -93,7 +93,7 @@ using JunctionTree = junction_tree::Graph;
 }
 
 struct component_t {
-    std::vector<relationship_graph::variable_t> variables;
+    std::vector<variable_t> variables;
     std::vector<float> edge_lengths;
 };
 

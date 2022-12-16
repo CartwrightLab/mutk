@@ -76,7 +76,7 @@ struct peeling_op_t {
 
 } //namespace detail
 
-
+struct potential_t { };
 
 class RelationshipGraph {
 public:

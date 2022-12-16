@@ -1,28 +1,16 @@
 simplify_graph() simplifies relationship graphs
 triangulate_graph() identifies cliques
 create_junction_tree() constructs a junction tree.
-KAllelesModel-Constructor
-KAllelesModel-CreateMatrix with any_t
-KAllelesModel-CreateMatrix with int
-KAllelesModel-CreateMatrix with mean_t
-KAllelesModel-CreatePriorHaploid
-KAllelesModel-CreatePriorDiploid
-create_transition_clone_diploid
-create_transition_clone_haploid
-create_transition_gamete_diploid
-create_transition_child_diploid_diploid
-create_transition_child_haploid_diploid
-create_transition_child_diploid_haploid
-create_transition_child_haploid_haploid
-create_transition_child_selfing_diploid
-create_transition_child_selfing_haploid
+MutationModel.Constructor
+MutationModel.CreateTransitionMatrix
+MutationModel.CreateMeanMatrix
+MutationModel.CreateCountMatrix
 parse_newick
 Pedigree-parse_sex
 Pedigree-parse_text
-RelationshipGraph-ConstructGraph
-RelationshipGraph-ConstructPeeler Single
-RelationshipGraph-ConstructPeeler Trio
-GeneralPeelingVertex-MakeMetadata
-GeneralPeelingVertex-Forward
+CloningPotential<2,2>.Create
+CloningPotential<1,1>.Create
+CloningPotential<2,1>.Create
+CloningPotential<1,2>.Create
 version_number_check_equal
 version_integer
