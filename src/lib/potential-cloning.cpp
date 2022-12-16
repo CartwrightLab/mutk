@@ -35,23 +35,25 @@ struct mutk::CloningPotential::Impl {
     Impl(const mutk::CloningPotential &p) : pot{p} {}
 
     inline
-    auto create_model_matrix(size_t n, mutk::Potential::any_t) const {
+    auto CreateModelMatrix(size_t n, mutk::Potential::any_t) const {
         return pot.model_.CreateTransitionMatrix(n, pot.u_);
     }
 
     inline
-    auto create_model_matrix(size_t n, mutk::Potential::mean_t a) const {
+    auto CreateModelMatrix(size_t n, mutk::Potential::mean_t a) const {
         auto aa = static_cast<std::underlying_type_t<mutk::Potential::mean_t>>(a);
-        return (aa > 0) ? pot.model_.CreateMeanMatrix(n, pot.u_) : pot.model_.CreateTransitionMatrix(n, pot.u_);
+        return (aa > 0) ? pot.model_.CreateMeanMatrix(n, pot.u_) :
+                          pot.model_.CreateTransitionMatrix(n, pot.u_);
     }
 
     inline
-    auto create_model_matrix(size_t n, mutk::Potential::some_t a) const {
+    auto CreateModelMatrix(size_t n, mutk::Potential::some_t a) const {
         auto aa = static_cast<std::underlying_type_t<mutk::Potential::some_t>>(a);
         return pot.model_.CreateCountMatrix(n, pot.u_, aa);
     }
 
     template<class Arg>
+    inline
     message_t operator()(size_t n, Arg a);
 
     // Use nested class to mimic partial template specialization for functions
@@ -65,6 +67,7 @@ struct mutk::CloningPotential::Impl {
 };
 
 template<class Arg>
+inline
 message_t mutk::CloningPotential::Impl::operator()(size_t n, Arg a) {
     auto ploidy0 = message_axis_ploidy(pot.labels_.sequence()[0]);
     auto ploidy1 = message_axis_ploidy(pot.labels_.sequence()[1]);
@@ -97,14 +100,14 @@ message_t mutk::CloningPotential::Create(size_t n, some_t a) {
 template<>
 template<class Arg>
 message_t mutk::CloningPotential::Impl::Create<11>::call(const Impl &impl, size_t n, Arg a) {
-    return impl.create_model_matrix(n, a);
+    return impl.CreateModelMatrix(n, a);
 }
 
 template<>
 template<class Arg>
 message_t mutk::CloningPotential::Impl::Create<21>::call(const Impl &impl, size_t n, Arg a) {
     auto ret = message_t::from_shape(impl.pot.Shape(n));
-    auto mat = impl.create_model_matrix(n, a);
+    auto mat = impl.CreateModelMatrix(n, a);
     for(message_t::size_type i = 0; i < ret.shape(0); ++i) {
         for(message_t::size_type j = 0; j < ret.shape(1); ++j) {
             // a/b -> x
@@ -120,7 +123,7 @@ template<>
 template<class Arg>
 message_t mutk::CloningPotential::Impl::Create<12>::call(const Impl &impl, size_t n, Arg a) {
     auto ret = message_t::from_shape(impl.pot.Shape(n));
-    auto mat = impl.create_model_matrix(n, a);
+    auto mat = impl.CreateModelMatrix(n, a);
     for(message_t::size_type i = 0; i < ret.shape(0); ++i) {
         for(message_t::size_type j = 0; j < ret.shape(1); ++j) {
             // a -> x/x
@@ -135,7 +138,7 @@ message_t mutk::CloningPotential::Impl::Create<12>::call(const Impl &impl, size_
 // If `a` is `any_t(0)` this will calculate P(j|i) via 1 loop.
 // If `a` is `some_t(k)` this will calculate P(k mutations & j | i) via k+1 loops.
 // If `a` is `mean_t(1)` this will calculate P(j|i)*E[number of mutations | j,i] via 2 loops.
-//     - This works because `create_model_matrix(... mean_t(0))` returns the transition matrix.
+//     - This works because `CreateModelMatrix(... mean_t(0))` returns the transition matrix.
 template<>
 template<class Arg>
 message_t mutk::CloningPotential::Impl::Create<22>::call(const Impl &impl, size_t n, Arg a) {
@@ -144,8 +147,8 @@ message_t mutk::CloningPotential::Impl::Create<22>::call(const Impl &impl, size_
     ret.fill(0.0f);
     int_t count = static_cast<int_t>(a);
     for(int_t k=0; k<=count; ++k) {
-        auto mat1 = impl.create_model_matrix(n, Arg(k));
-        auto mat2 = impl.create_model_matrix(n, Arg(count-k));
+        auto mat1 = impl.CreateModelMatrix(n, Arg(k));
+        auto mat2 = impl.CreateModelMatrix(n, Arg(count-k));
         for(message_size_t i = 0; i < ret.shape(0); ++i) {
             for(message_size_t j = 0; j < ret.shape(1); ++j) {
                 // a/b -> x/y
