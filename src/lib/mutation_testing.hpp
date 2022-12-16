@@ -25,6 +25,8 @@
 #ifndef MUTK_MUTATION_TESTING_HPP
 #define MUTK_MUTATION_TESTING_HPP
 
+#include <mutk/message.hpp>
+
 // Libraries needed for testing
 #include <boost/numeric/ublas/matrix.hpp>
 
@@ -67,6 +69,22 @@ void run_mutation_tests(F test) {
     test(4, 1e-9, 5.0);
     test(4, 1e-6, 6.0);
     test(4, 1e-3, 7.0);
+}
+
+// for debugging purposes
+namespace std {
+inline
+std::ostream& operator<< (std::ostream& os, const mutk::message_t::shape_type & value) {
+    os << "{";
+    for(size_t i = 0; i < value.size(); ++i) {
+        if(i > 0) {
+            os << ", ";
+        }
+        os << value[i];
+    }
+    os << "}";
+    return os;
+}
 }
 
 #endif

@@ -8,9 +8,9 @@ MutationModel.CreateCountMatrix
 parse_newick
 Pedigree-parse_sex
 Pedigree-parse_text
-CloningPotential<2,2>.Create
-CloningPotential<1,1>.Create
-CloningPotential<2,1>.Create
-CloningPotential<1,2>.Create
+CloningPotential.Create for Diploid-Diploid
+CloningPotential.Create for Diploid-Haploid
+CloningPotential.Create for Haploid-Diploid
+CloningPotential.Create for Haploid-Haploid
 version_number_check_equal
 version_integer

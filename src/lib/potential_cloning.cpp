@@ -30,33 +30,81 @@
 using mutk::message_t;
 using mutk::Ploidy;
 
-inline
-auto create_model_matrix(const mutk::MutationModel &m, size_t n, float_t t, mutk::Potential::any_t) {
-    return m.CreateTransitionMatrix(n, t);
+// Use some template magic to allow maximum deduplication of code.
+struct mutk::CloningPotential::Impl {
+    Impl(const mutk::CloningPotential &p) : pot{p} {}
+
+    inline
+    auto create_model_matrix(size_t n, mutk::Potential::any_t) const {
+        return pot.model_.CreateTransitionMatrix(n, pot.u_);
+    }
+
+    inline
+    auto create_model_matrix(size_t n, mutk::Potential::mean_t a) const {
+        auto aa = static_cast<std::underlying_type_t<mutk::Potential::mean_t>>(a);
+        return (aa > 0) ? pot.model_.CreateMeanMatrix(n, pot.u_) : pot.model_.CreateTransitionMatrix(n, pot.u_);
+    }
+
+    inline
+    auto create_model_matrix(size_t n, mutk::Potential::some_t a) const {
+        auto aa = static_cast<std::underlying_type_t<mutk::Potential::some_t>>(a);
+        return pot.model_.CreateCountMatrix(n, pot.u_, aa);
+    }
+
+    template<class Arg>
+    message_t operator()(size_t n, Arg a);
+
+    // Use nested class to mimic partial template specialization for functions
+    template<int N>
+    struct Create {
+        template<class Arg>
+        static message_t call(const Impl &impl, size_t n, Arg a);
+    };
+
+    const mutk::CloningPotential &pot;
+};
+
+template<class Arg>
+message_t mutk::CloningPotential::Impl::operator()(size_t n, Arg a) {
+    auto ploidy0 = message_axis_ploidy(pot.labels_.sequence()[0]);
+    auto ploidy1 = message_axis_ploidy(pot.labels_.sequence()[1]);
+
+    if(ploidy0 == Ploidy::Diploid) {
+        if(ploidy1 == Ploidy::Diploid) {
+            return Create<22>::call(*this, n, a);
+        } else {
+            return Create<21>::call(*this, n, a);
+        }
+    } else if(ploidy1 == Ploidy::Diploid) {
+        return Create<12>::call(*this, n, a);
+    } else {
+        return Create<11>::call(*this, n, a);
+    }
 }
 
-inline
-auto create_model_matrix(const mutk::MutationModel &m, size_t n, float_t t, mutk::Potential::mean_t a) {
-    auto b = static_cast<std::underlying_type_t<mutk::Potential::mean_t>>(a);
-    return (b > 0) ? m.CreateMeanMatrix(n, t) : m.CreateTransitionMatrix(n, t);
+message_t mutk::CloningPotential::Create(size_t n, any_t a) {
+    return CloningPotential::Impl(*this)(n,a);
 }
 
-inline
-auto create_model_matrix(const mutk::MutationModel &m, size_t n, float_t t, mutk::Potential::some_t a) {
-    return m.CreateCountMatrix(n, t, +a);
+message_t mutk::CloningPotential::Create(size_t n, mean_t a) {
+    return CloningPotential::Impl(*this)(n,a);
+}
+
+message_t mutk::CloningPotential::Create(size_t n, some_t a) {
+    return CloningPotential::Impl(*this)(n,a);
 }
 
 template<>
 template<class Arg>
-message_t mutk::CloningPotential<Ploidy::Haploid, Ploidy::Haploid>::DoCreate(size_t n, Arg a) {
-    return create_model_matrix(model_, u_, n, a);
+message_t mutk::CloningPotential::Impl::Create<11>::call(const Impl &impl, size_t n, Arg a) {
+    return impl.create_model_matrix(n, a);
 }
 
 template<>
 template<class Arg>
-message_t mutk::CloningPotential<Ploidy::Diploid, Ploidy::Haploid>::DoCreate(size_t n, Arg a) {
-    auto ret = message_t::from_shape(MessageShape(n));
-    auto mat = create_model_matrix(model_, u_, n, a);
+message_t mutk::CloningPotential::Impl::Create<21>::call(const Impl &impl, size_t n, Arg a) {
+    auto ret = message_t::from_shape(impl.pot.Shape(n));
+    auto mat = impl.create_model_matrix(n, a);
     for(message_t::size_type i = 0; i < ret.shape(0); ++i) {
         for(message_t::size_type j = 0; j < ret.shape(1); ++j) {
             // a/b -> x
@@ -70,9 +118,9 @@ message_t mutk::CloningPotential<Ploidy::Diploid, Ploidy::Haploid>::DoCreate(siz
 
 template<>
 template<class Arg>
-message_t mutk::CloningPotential<Ploidy::Haploid, Ploidy::Diploid>::DoCreate(size_t n, Arg a) {
-    auto ret = message_t::from_shape(MessageShape(n));
-    auto mat = create_model_matrix(model_, u_, n, a);
+message_t mutk::CloningPotential::Impl::Create<12>::call(const Impl &impl, size_t n, Arg a) {
+    auto ret = message_t::from_shape(impl.pot.Shape(n));
+    auto mat = impl.create_model_matrix(n, a);
     for(message_t::size_type i = 0; i < ret.shape(0); ++i) {
         for(message_t::size_type j = 0; j < ret.shape(1); ++j) {
             // a -> x/x
@@ -90,14 +138,14 @@ message_t mutk::CloningPotential<Ploidy::Haploid, Ploidy::Diploid>::DoCreate(siz
 //     - This works because `create_model_matrix(... mean_t(0))` returns the transition matrix.
 template<>
 template<class Arg>
-message_t mutk::CloningPotential<Ploidy::Diploid, Ploidy::Diploid>::DoCreate(size_t n, Arg a) {
+message_t mutk::CloningPotential::Impl::Create<22>::call(const Impl &impl, size_t n, Arg a) {
     using int_t = std::underlying_type_t<Arg>;
-    auto ret = message_t::from_shape(MessageShape(n));
+    auto ret = message_t::from_shape(impl.pot.Shape(n));
     ret.fill(0.0f);
     int_t count = static_cast<int_t>(a);
     for(int_t k=0; k<=count; ++k) {
-        auto mat1 = create_model_matrix(model_, u_, n, Arg(k));
-        auto mat2 = create_model_matrix(model_, u_, n, Arg(count-k));
+        auto mat1 = impl.create_model_matrix(n, Arg(k));
+        auto mat2 = impl.create_model_matrix(n, Arg(count-k));
         for(message_size_t i = 0; i < ret.shape(0); ++i) {
             for(message_size_t j = 0; j < ret.shape(1); ++j) {
                 // a/b -> x/y
@@ -124,14 +172,12 @@ message_t mutk::CloningPotential<Ploidy::Diploid, Ploidy::Diploid>::DoCreate(siz
 //   1: <1,0>
 
 // LCOV_EXCL_START
-TEST_CASE("CloningPotential<2,2>.Create") {
+TEST_CASE("CloningPotential.Create for Diploid-Diploid") {
     using mutk::variable_t;
 
-    using pot_t = mutk::CloningPotential<Ploidy::Diploid,Ploidy::Diploid>;
-
-    mutk::Potential::labels_t labels({
-        {variable_t{0}, Ploidy::Diploid},
-        {variable_t{1}, Ploidy::Diploid}
+    std::vector<mutk::message_label_t> labels({
+        mutk::make_message_label(variable_t{0}, Ploidy::Diploid),
+        mutk::make_message_label(variable_t{1}, Ploidy::Diploid)
     });
 
     auto test = [&](size_t n, float u, float k) {
@@ -141,7 +187,7 @@ TEST_CASE("CloningPotential<2,2>.Create") {
         S{0,0}; // silences a warning
 
         mutk::MutationModel model(k, 0.001, 0, 0, 0);
-        auto pot = pot_t(labels, model, u);
+        auto pot = mutk::CloningPotential(model, u, labels);
 
         auto obs_any = pot.Create(n, mutk::Potential::ANY);
         auto obs_mean = pot.Create(n, mutk::Potential::MEAN);
@@ -155,11 +201,11 @@ TEST_CASE("CloningPotential<2,2>.Create") {
         auto mat1 = model.CreateCountMatrix(n, u, 1);
         auto mat2 = model.CreateCountMatrix(n, u, 2);
 
-        CHECK(matp.shape() == S{n*(n+1)/2,n*(n+1)/2});
-        CHECK(matpm.shape() == S{n*(n+1)/2,n*(n+1)/2});
-        CHECK(mat0.shape() == S{n*(n+1)/2,n*(n+1)/2});
-        CHECK(mat1.shape() == S{n*(n+1)/2,n*(n+1)/2});
-        CHECK(mat2.shape() == S{n*(n+1)/2,n*(n+1)/2});
+        CHECK(obs_any.shape() == S{n*(n+1)/2,n*(n+1)/2});
+        CHECK(obs_mean.shape() == S{n*(n+1)/2,n*(n+1)/2});
+        CHECK(obs_zero.shape() == S{n*(n+1)/2,n*(n+1)/2});
+        CHECK(obs_one.shape() == S{n*(n+1)/2,n*(n+1)/2});
+        CHECK(obs_two.shape() == S{n*(n+1)/2,n*(n+1)/2});
 
         for(size_t a1=0,a=0;a1<n;++a1) {
             for(size_t a2=0;a2<=a1;++a2,++a) {
@@ -196,16 +242,13 @@ TEST_CASE("CloningPotential<2,2>.Create") {
 // LCOV_EXCL_STOP
 
 // LCOV_EXCL_START
-TEST_CASE("CloningPotential<1,1>.Create") {
+TEST_CASE("CloningPotential.Create for Diploid-Haploid") {
     using mutk::variable_t;
 
-    using pot_t = mutk::CloningPotential<Ploidy::Haploid,Ploidy::Haploid>;
-
-    mutk::Potential::labels_t labels({
-        {variable_t{0}, Ploidy::Haploid},
-        {variable_t{1}, Ploidy::Haploid}
+    std::vector<mutk::message_label_t> labels({
+        mutk::make_message_label(variable_t{0}, Ploidy::Diploid),
+        mutk::make_message_label(variable_t{1}, Ploidy::Haploid)
     });
-
     auto test = [&](size_t n, float u, float k) {
         CAPTURE(n); CAPTURE(k); CAPTURE(u);
 
@@ -213,7 +256,7 @@ TEST_CASE("CloningPotential<1,1>.Create") {
         S{0,0}; // silences a warning
 
         mutk::MutationModel model(k, 0.001, 0, 0, 0);
-        auto pot = pot_t(labels, model, u);
+        auto pot = mutk::CloningPotential(model, u, labels);
 
         auto obs_any = pot.Create(n, mutk::Potential::ANY);
         auto obs_mean = pot.Create(n, mutk::Potential::MEAN);
@@ -227,71 +270,11 @@ TEST_CASE("CloningPotential<1,1>.Create") {
         auto mat1 = model.CreateCountMatrix(n, u, 1);
         auto mat2 = model.CreateCountMatrix(n, u, 2);
 
-        CHECK(matp.shape() == S{n,n});
-        CHECK(matpm.shape() == S{n,n});
-        CHECK(mat0.shape() == S{n,n});
-        CHECK(mat1.shape() == S{n,n});
-        CHECK(mat2.shape() == S{n,n});
-
-        for(size_t a=0;a<n;++a) {
-            for(size_t b=0;b<n;++b) {
-                INFO("Transition: ", a, " -> ", b, " (", a, " -> ", b, ")");
-                // a -> b
-                float val_any = matp(a,b);
-                float val_mean = matpm(a,b);
-                float val_zero = mat0(a,b);
-                float val_one = mat1(a,b);
-                float val_two = mat2(a,b);
-
-                CHECK(obs_any(a,b)  == doctest::Approx(val_any));
-                CHECK(obs_mean(a,b) == doctest::Approx(val_mean));
-                CHECK(obs_zero(a,b) == doctest::Approx(val_zero));
-                CHECK(obs_one(a,b)  == doctest::Approx(val_one));
-                CHECK(obs_two(a,b)  == doctest::Approx(val_two));
-            }
-        }
-    };
-    run_mutation_tests(test);
-}
-// LCOV_EXCL_STOP
-
-// LCOV_EXCL_START
-TEST_CASE("CloningPotential<2,1>.Create") {
-    using mutk::variable_t;
-
-    using pot_t = mutk::CloningPotential<Ploidy::Diploid,Ploidy::Haploid>;
-
-    mutk::Potential::labels_t labels({
-        {variable_t{0}, Ploidy::Diploid},
-        {variable_t{1}, Ploidy::Haploid}
-    });
-
-    auto test = [&](size_t n, float u, float k) {
-        CAPTURE(n); CAPTURE(k); CAPTURE(u);
-
-        using S = mutk::message_shape_t;
-        S{0,0}; // silences a warning
-
-        mutk::MutationModel model(k, 0.001, 0, 0, 0);
-        auto pot = pot_t(labels, model, u);
-
-        auto obs_any = pot.Create(n, mutk::Potential::ANY);
-        auto obs_mean = pot.Create(n, mutk::Potential::MEAN);
-        auto obs_zero = pot.Create(n, mutk::Potential::ZERO);
-        auto obs_one = pot.Create(n, mutk::Potential::ONE);
-        auto obs_two = pot.Create(n, mutk::Potential::TWO);
-
-        auto matp = model.CreateTransitionMatrix(n, u);
-        auto matpm = model.CreateMeanMatrix(n, u);
-        auto mat0 = model.CreateCountMatrix(n, u, 0);
-        auto mat1 = model.CreateCountMatrix(n, u, 1);
-        auto mat2 = model.CreateCountMatrix(n, u, 2);
-
-        CHECK(matp.shape() == S{n,n});
-        CHECK(matpm.shape() == S{n,n});
-        CHECK(mat0.shape() == S{n,n});
-        CHECK(mat1.shape() == S{n,n});
-        CHECK(mat2.shape() == S{n,n});
+        CHECK(obs_any.shape() == S{n*(n+1)/2,n});
+        CHECK(obs_mean.shape() == S{n*(n+1)/2,n});
+        CHECK(obs_zero.shape() == S{n*(n+1)/2,n});
+        CHECK(obs_one.shape() == S{n*(n+1)/2,n});
+        CHECK(obs_two.shape() == S{n*(n+1)/2,n});
 
         for(size_t a1=0,a=0;a1<n;++a1) {
             for(size_t a2=0;a2<=a1;++a2,++a) {
@@ -318,14 +301,12 @@ TEST_CASE("CloningPotential<2,1>.Create") {
 // LCOV_EXCL_STOP
 
 // LCOV_EXCL_START
-TEST_CASE("CloningPotential<1,2>.Create") {
+TEST_CASE("CloningPotential.Create for Haploid-Diploid") {
     using mutk::variable_t;
 
-    using pot_t = mutk::CloningPotential<Ploidy::Diploid,Ploidy::Haploid>;
-
-    mutk::Potential::labels_t labels({
-        {variable_t{0}, Ploidy::Diploid},
-        {variable_t{1}, Ploidy::Haploid}
+    std::vector<mutk::message_label_t> labels({
+        mutk::make_message_label(variable_t{0}, Ploidy::Haploid),
+        mutk::make_message_label(variable_t{1}, Ploidy::Diploid)
     });
 
     auto test = [&](size_t n, float u, float k) {
@@ -335,7 +316,7 @@ TEST_CASE("CloningPotential<1,2>.Create") {
         S{0,0}; // silences a warning
 
         mutk::MutationModel model(k, 0.001, 0, 0, 0);
-        auto pot = pot_t(labels, model, u);
+        auto pot = mutk::CloningPotential(model, u, labels);
 
         auto obs_any = pot.Create(n, mutk::Potential::ANY);
         auto obs_mean = pot.Create(n, mutk::Potential::MEAN);
@@ -349,11 +330,11 @@ TEST_CASE("CloningPotential<1,2>.Create") {
         auto mat1 = model.CreateCountMatrix(n, u, 1);
         auto mat2 = model.CreateCountMatrix(n, u, 2);
 
-        CHECK(matp.shape() == S{n,n});
-        CHECK(matpm.shape() == S{n,n});
-        CHECK(mat0.shape() == S{n,n});
-        CHECK(mat1.shape() == S{n,n});
-        CHECK(mat2.shape() == S{n,n});
+        CHECK(obs_any.shape() == S{n,n*(n+1)/2});
+        CHECK(obs_mean.shape() == S{n,n*(n+1)/2});
+        CHECK(obs_zero.shape() == S{n,n*(n+1)/2});
+        CHECK(obs_one.shape() == S{n,n*(n+1)/2});
+        CHECK(obs_two.shape() == S{n,n*(n+1)/2});
 
         for(size_t a=0;a<n;++a) {
             for(size_t b1=0,b=0;b1<n;++b1) {
@@ -372,6 +353,64 @@ TEST_CASE("CloningPotential<1,2>.Create") {
                     CHECK(obs_one(a,b)  == doctest::Approx(val_one));
                     CHECK(obs_two(a,b)  == doctest::Approx(val_two));
                 }
+            }
+        }
+    };
+    run_mutation_tests(test);
+}
+// LCOV_EXCL_STOP
+
+// LCOV_EXCL_START
+TEST_CASE("CloningPotential.Create for Haploid-Haploid") {
+    using mutk::variable_t;
+
+    std::vector<mutk::message_label_t> labels({
+        mutk::make_message_label(variable_t{0}, Ploidy::Haploid),
+        mutk::make_message_label(variable_t{1}, Ploidy::Haploid)
+    });
+
+    auto test = [&](size_t n, float u, float k) {
+        CAPTURE(n); CAPTURE(k); CAPTURE(u);
+
+        using S = mutk::message_shape_t;
+        S{0,0}; // silences a warning
+
+        mutk::MutationModel model(k, 0.001, 0, 0, 0);
+        auto pot = mutk::CloningPotential(model, u, labels);
+
+        auto obs_any = pot.Create(n, mutk::Potential::ANY);
+        auto obs_mean = pot.Create(n, mutk::Potential::MEAN);
+        auto obs_zero = pot.Create(n, mutk::Potential::ZERO);
+        auto obs_one = pot.Create(n, mutk::Potential::ONE);
+        auto obs_two = pot.Create(n, mutk::Potential::TWO);
+
+        auto matp = model.CreateTransitionMatrix(n, u);
+        auto matpm = model.CreateMeanMatrix(n, u);
+        auto mat0 = model.CreateCountMatrix(n, u, 0);
+        auto mat1 = model.CreateCountMatrix(n, u, 1);
+        auto mat2 = model.CreateCountMatrix(n, u, 2);
+
+        CHECK(obs_any.shape() == S{n,n});
+        CHECK(obs_mean.shape() == S{n,n});
+        CHECK(obs_zero.shape() == S{n,n});
+        CHECK(obs_one.shape() == S{n,n});
+        CHECK(obs_two.shape() == S{n,n});
+
+        for(size_t a=0;a<n;++a) {
+            for(size_t b=0;b<n;++b) {
+                INFO("Transition: ", a, " -> ", b, " (", a, " -> ", b, ")");
+                // a -> b
+                float val_any = matp(a,b);
+                float val_mean = matpm(a,b);
+                float val_zero = mat0(a,b);
+                float val_one = mat1(a,b);
+                float val_two = mat2(a,b);
+
+                CHECK(obs_any(a,b)  == doctest::Approx(val_any));
+                CHECK(obs_mean(a,b) == doctest::Approx(val_mean));
+                CHECK(obs_zero(a,b) == doctest::Approx(val_zero));
+                CHECK(obs_one(a,b)  == doctest::Approx(val_one));
+                CHECK(obs_two(a,b)  == doctest::Approx(val_two));
             }
         }
     };

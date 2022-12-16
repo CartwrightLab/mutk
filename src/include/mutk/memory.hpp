@@ -56,22 +56,4 @@ constexpr tensor_t::size_type dim_width(tensor_t::size_type n) {
 
 } // namespace mutk
 
-// for debugging purposes
-namespace std {
-inline
-std::ostream& operator<< (std::ostream& os, const mutk::shape_t& value) {
-    os << "{";
-    for(size_t i = 0; i < value.size(); ++i) {
-        if(i > 0) {
-            os << ", ";
-        }
-        os << value[i];
-    }
-    os << "}";
-    return os;
-}
-}
-
-
-
 #endif // MUTK_MEMORY_HPP

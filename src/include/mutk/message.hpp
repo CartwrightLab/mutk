@@ -32,39 +32,47 @@
 #include <xtensor/xio.hpp>
 #include <xtensor/xgenerator.hpp>
 
-#include <boost/container/flat_map.hpp>
-
 namespace mutk {
 
-enum struct variable_t : int {};
+enum struct variable_t : unsigned int {};
 constexpr auto operator+(variable_t value) {
     return static_cast<std::underlying_type_t<variable_t>>(value);
 }
 
-enum struct Ploidy : int {
+enum struct Ploidy : unsigned int {
     Noploid = 0,
     Haploid = 1,
     Diploid = 2
 };
+
+enum struct message_label_t : unsigned int {};
+
+constexpr
+message_label_t make_message_label(variable_t v, Ploidy p) {
+    auto vv = static_cast<std::underlying_type_t<variable_t>>(v);
+    return message_label_t{2*vv+(p == Ploidy::Diploid)};
+}
+
+constexpr
+std::pair<variable_t,Ploidy> unmake_message_label(message_label_t label) {
+    auto ll = static_cast<std::underlying_type_t<message_label_t>>(label);
+    return std::make_pair(variable_t{ll/2}, Ploidy{(ll & 0x1)+1});
+}
 
 using float_t = float;
 using message_t = xt::xarray<float_t>;
 using message_shape_t = message_t::shape_type;
 using message_size_t = message_t::size_type;
 
-using message_labels_t = boost::container::flat_map<variable_t, Ploidy>;
-
-inline
 constexpr message_size_t num_diploids(message_size_t n) {
     return n*(n+1)/2;
 }
 
-inline
 constexpr message_size_t num_haploids(message_size_t n) {
     return n;
 }
 
-inline constexpr
+constexpr
 auto diploid_alleles(int x) {
     constexpr int ALLELE[][2] = {
         {0,0},
@@ -77,13 +85,18 @@ auto diploid_alleles(int x) {
     return std::make_pair(ALLELE[x][0], ALLELE[x][1]);
 }
 
-inline constexpr
+constexpr
 auto haploid_allele(int x) {
     return x;
 }
 
-inline
-constexpr message_size_t message_dimension_length(message_size_t n, Ploidy h) {
+constexpr
+Ploidy message_axis_ploidy(message_label_t label) {
+    return unmake_message_label(label).second;
+}
+
+
+constexpr message_size_t message_axis_size(message_size_t n, Ploidy h) {
     switch(h) {
      case Ploidy::Noploid:
         return 0;
@@ -95,15 +108,8 @@ constexpr message_size_t message_dimension_length(message_size_t n, Ploidy h) {
     return 0;
 }
 
-inline
-message_shape_t message_shape(message_size_t n, const message_labels_t & labels) {
-    const auto & seq = labels.sequence();
-    message_shape_t ret;
-    ret.resize(seq.size());
-    for(message_size_t i=0; i < seq.size(); ++i) {
-        ret[i] = message_dimension_length(n, seq[i].second);
-    }
-    return ret;
+constexpr message_size_t message_axis_size(message_size_t n, message_label_t label) {
+    return message_axis_size(n, message_axis_ploidy(label));
 }
 
 // make_message(n, {pl})

@@ -29,19 +29,16 @@ using mutk::message_t;
 // ==== UNIT POTENTIAL =========================================================
 
 message_t mutk::UnitPotential::Create(size_t n, any_t) {
-    auto shape = message_shape(n, labels_);
-    return xt::ones<float_t>(shape);
+    return xt::ones<float_t>(Shape(n));
 }
 
 message_t mutk::UnitPotential::Create(size_t n, mean_t) {
-    auto shape = message_shape(n, labels_);
-    return xt::zeros<float_t>(shape);
+    return xt::zeros<float_t>(Shape(n));
 }
 
 message_t mutk::UnitPotential::Create(size_t n, some_t k) {
-    auto shape = message_shape(n, labels_);
-    if(+k == 0) {
-        return xt::ones<float_t>(shape);
+    if(k == some_t{0}) {
+        return xt::ones<float_t>(Shape(n));
     }
-    return xt::zeros<float_t>(shape);
+    return xt::zeros<float_t>(Shape(n));
 }

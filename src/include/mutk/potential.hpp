@@ -25,10 +25,11 @@
 #ifndef MUTK_POTENTIAL_HPP
 #define MUTK_POTENTIAL_HPP
 
-#include <vector>
-
 #include "message.hpp"
 #include "mutation.hpp"
+
+#include <boost/container/flat_set.hpp>
+#include <vector>
 
 namespace mutk {
 
@@ -51,9 +52,16 @@ enum struct PotentialType {
 
 class Potential {
  public:
-    using labels_t = message_labels_t;
+    using labels_t = boost::container::flat_set<message_label_t>;
 
     Potential(labels_t labels) : labels_{std::move(labels)} {}
+
+    template<class It>
+    Potential(It first, It last) : labels_{first, last} {}
+
+    Potential(const std::vector<message_label_t> &seq) : Potential(seq.begin(), seq.end()) {}
+
+    Potential(std::initializer_list<message_label_t> init) : labels_{init} {}
 
     virtual ~Potential() = default;
 
@@ -65,24 +73,21 @@ class Potential {
     virtual message_t Create(message_size_t n, some_t) = 0;
     virtual message_t Create(message_size_t n, mean_t) = 0;
 
-    static constexpr any_t ANY{0};
+    static constexpr any_t  ANY{0};
     static constexpr mean_t MEAN{1};
     static constexpr some_t ZERO{0};
     static constexpr some_t ONE{1};
     static constexpr some_t TWO{2};
 
+    message_t::shape_type Shape(int n) const;
+
  protected:
     labels_t labels_;
 };
 
-inline
-constexpr auto operator+(Potential::some_t value) {
-    return static_cast<std::underlying_type_t<Potential::some_t>>(value);
-}
-
 class UnitPotential : public Potential {
  public:
-    UnitPotential(labels_t labels) : Potential(std::move(labels)) { }
+    using Potential::Potential;
 
     virtual message_t Create(message_size_t n, any_t) override;
     virtual message_t Create(message_size_t n, some_t) override;
@@ -91,18 +96,19 @@ class UnitPotential : public Potential {
 
 class MutationPotential : public Potential {
  public:
-    MutationPotential(labels_t labels, const MutationModel & model) : Potential(std::move(labels)),
+    template<typename... Args>
+    MutationPotential(const MutationModel & model, Args... args) : Potential(std::forward<Args>(args)...),
         model_(model) { }
 
  protected:
     MutationModel model_;
 };
 
-template<Ploidy P, Ploidy C>
 class CloningPotential : public MutationPotential {
  public:
-    CloningPotential(labels_t labels, const MutationModel & model,
-        float_t u) : MutationPotential(std::move(labels), model),
+    template<typename... Args>
+    CloningPotential(const MutationModel & model,
+        float_t u, Args... args) : MutationPotential(model, std::forward<Args>(args)...),
         u_(u) { }
 
     virtual message_t Create(message_size_t n, any_t val) override;
@@ -110,22 +116,16 @@ class CloningPotential : public MutationPotential {
     virtual message_t Create(message_size_t n, mean_t) override;    
 
  protected:
-    template<class Arg>
-    message_t DoCreate(message_size_t n, Arg);
-
-    inline auto MessageShape(message_size_t n) {
-        auto d1 = message_dimension_length(n, P);
-        auto d2 = message_dimension_length(n, C);
-        return std::array<message_size_t, 2>({d1, d2});
-    }
-
     float_t u_;
+
+    struct Impl;
 };
 
 class SelfingPotential : public MutationPotential {
  public:
-    SelfingPotential(labels_t labels, const MutationModel & model,
-        float_t len_a, float_t len_b) : MutationPotential(std::move(labels), model),
+    template<typename... Args>
+    SelfingPotential(const MutationModel & model, float_t len_a, float_t len_b,
+        Args... args) : MutationPotential(std::forward<Args>(args)..., model),
         len_a_(len_a), len_b_(len_a) { }
 
     virtual message_t Create(message_size_t n, any_t) override;
@@ -158,19 +158,12 @@ class SelfingPotential : public MutationPotential {
 // 1 -> 2
 // 1 -> 1
 
-template<Ploidy A, Ploidy B>
-message_t CloningPotential<A,B>::Create(size_t n, any_t a) {
-    return DoCreate(n, a);
-}
-
-template<Ploidy A, Ploidy B>
-message_t CloningPotential<A,B>::Create(size_t n, mean_t a) {
-    return DoCreate(n, a);
-}
-
-template<Ploidy A, Ploidy B>
-message_t CloningPotential<A,B>::Create(size_t n, some_t a) {
-    return DoCreate(n, a);
+inline
+message_t::shape_type Potential::Shape(int n) const {
+    message_t::shape_type ret(labels_.size());
+    std::transform(labels_.begin(), labels_.end(), ret.begin(),
+        [n](auto v) { return message_axis_size(n,v); });
+    return ret;
 }
 
 } // namespace mutk

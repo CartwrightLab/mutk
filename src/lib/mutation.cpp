@@ -60,30 +60,6 @@ MutationModel::array_t MutationModel::CreateTransitionMatrix(message_size_t n, f
     return ret;
 }
 
-
-
-// ret(i,j) = E[num of mutations | i,j]*P(j|i)
-// Estimated via Mathematica
-MutationModel::array_t MutationModel::CreateMeanMatrix(message_size_t n, float_t t) const {
-    assert(n > 0);
-    assert(n <= 5);
-
-    double beta = k_/(k_-1.0);
-    double p = -expm1(-beta*t);
-
-    double p_ii = p * t/k_;
-    double p_ij = (k_-p)/(k_-1.0) * t/k_;
-
-    array_t ret = array_t::from_shape({n,n});
-
-    for(message_size_t i = 0; i < n; ++i) {
-        for(message_size_t j = 0; j < n; ++j) {
-            ret(i,j) = (i == j) ? p_ii : p_ij;
-        }
-    }
-    return ret;
-}
-
 // ret(i,j) = P(j & x mutations | i)
 //
 // beta = k/(k-1)
@@ -108,6 +84,28 @@ MutationModel::array_t MutationModel::CreateCountMatrix(message_size_t n, float_
     for(size_t i = 0; i < n; ++i) {
         for(size_t j = 0; j < n; ++j) {
             ret(i,j) = (i == j) ? p_x*p_ii : p_x*p_ij;
+        }
+    }
+    return ret;
+}
+
+// ret(i,j) = E[num of mutations | i,j]*P(j|i)
+// Estimated via Mathematica
+MutationModel::array_t MutationModel::CreateMeanMatrix(message_size_t n, float_t t) const {
+    assert(n > 0);
+    assert(n <= 5);
+
+    double beta = k_/(k_-1.0);
+    double p = -expm1(-beta*t);
+
+    double p_ii = p * t/k_;
+    double p_ij = (k_-p)/(k_-1.0) * t/k_;
+
+    array_t ret = array_t::from_shape({n,n});
+
+    for(message_size_t i = 0; i < n; ++i) {
+        for(message_size_t j = 0; j < n; ++j) {
+            ret(i,j) = (i == j) ? p_ii : p_ij;
         }
     }
     return ret;
