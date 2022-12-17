@@ -99,15 +99,15 @@ message_t mutk::CloningPotential::Create(size_t n, some_t a) {
 
 template<>
 template<class Arg>
-message_t mutk::CloningPotential::Impl::Create<11>::call(const Impl &impl, size_t n, Arg a) {
-    return impl.CreateModelMatrix(n, a);
+message_t mutk::CloningPotential::Impl::Create<11>::call(const Impl &impl, size_t n, Arg arg) {
+    return impl.CreateModelMatrix(n, arg);
 }
 
 template<>
 template<class Arg>
-message_t mutk::CloningPotential::Impl::Create<21>::call(const Impl &impl, size_t n, Arg a) {
+message_t mutk::CloningPotential::Impl::Create<21>::call(const Impl &impl, size_t n, Arg arg) {
     auto ret = message_t::from_shape(impl.pot.Shape(n));
-    auto mat = impl.CreateModelMatrix(n, a);
+    auto mat = impl.CreateModelMatrix(n, arg);
     for(message_t::size_type i = 0; i < ret.shape(0); ++i) {
         for(message_t::size_type j = 0; j < ret.shape(1); ++j) {
             // a/b -> x
@@ -121,9 +121,9 @@ message_t mutk::CloningPotential::Impl::Create<21>::call(const Impl &impl, size_
 
 template<>
 template<class Arg>
-message_t mutk::CloningPotential::Impl::Create<12>::call(const Impl &impl, size_t n, Arg a) {
+message_t mutk::CloningPotential::Impl::Create<12>::call(const Impl &impl, size_t n, Arg arg) {
     auto ret = message_t::from_shape(impl.pot.Shape(n));
-    auto mat = impl.CreateModelMatrix(n, a);
+    auto mat = impl.CreateModelMatrix(n, arg);
     for(message_t::size_type i = 0; i < ret.shape(0); ++i) {
         for(message_t::size_type j = 0; j < ret.shape(1); ++j) {
             // a -> x/x
@@ -141,14 +141,14 @@ message_t mutk::CloningPotential::Impl::Create<12>::call(const Impl &impl, size_
 //     - This works because `CreateModelMatrix(... mean_t(0))` returns the transition matrix.
 template<>
 template<class Arg>
-message_t mutk::CloningPotential::Impl::Create<22>::call(const Impl &impl, size_t n, Arg a) {
+message_t mutk::CloningPotential::Impl::Create<22>::call(const Impl &impl, size_t n, Arg arg) {
     using int_t = std::underlying_type_t<Arg>;
     auto ret = message_t::from_shape(impl.pot.Shape(n));
     ret.fill(0.0f);
-    int_t count = static_cast<int_t>(a);
-    for(int_t k=0; k<=count; ++k) {
+    int_t val = static_cast<int_t>(arg);
+    for(int_t k=0; k<=val; ++k) {
         auto mat1 = impl.CreateModelMatrix(n, Arg(k));
-        auto mat2 = impl.CreateModelMatrix(n, Arg(count-k));
+        auto mat2 = impl.CreateModelMatrix(n, Arg(val-k));
         for(message_size_t i = 0; i < ret.shape(0); ++i) {
             for(message_size_t j = 0; j < ret.shape(1); ++j) {
                 // a/b -> x/y
@@ -183,7 +183,7 @@ TEST_CASE("CloningPotential.Create for Diploid-Diploid") {
         mutk::make_message_label(variable_t{1}, Ploidy::Diploid)
     });
 
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n); CAPTURE(k); CAPTURE(u);
 
         using S = mutk::message_shape_t;
@@ -252,7 +252,7 @@ TEST_CASE("CloningPotential.Create for Diploid-Haploid") {
         mutk::make_message_label(variable_t{0}, Ploidy::Diploid),
         mutk::make_message_label(variable_t{1}, Ploidy::Haploid)
     });
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n); CAPTURE(k); CAPTURE(u);
 
         using S = mutk::message_shape_t;
@@ -312,7 +312,7 @@ TEST_CASE("CloningPotential.Create for Haploid-Diploid") {
         mutk::make_message_label(variable_t{1}, Ploidy::Diploid)
     });
 
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n); CAPTURE(k); CAPTURE(u);
 
         using S = mutk::message_shape_t;
@@ -372,7 +372,7 @@ TEST_CASE("CloningPotential.Create for Haploid-Haploid") {
         mutk::make_message_label(variable_t{1}, Ploidy::Haploid)
     });
 
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n); CAPTURE(k); CAPTURE(u);
 
         using S = mutk::message_shape_t;

@@ -124,17 +124,19 @@ class CloningPotential : public MutationPotential {
 class SelfingPotential : public MutationPotential {
  public:
     template<typename... Args>
-    SelfingPotential(const MutationModel & model, float_t len_a, float_t len_b,
-        Args... args) : MutationPotential(std::forward<Args>(args)..., model),
-        len_a_(len_a), len_b_(len_a) { }
+    SelfingPotential(const MutationModel & model, float_t u, float_t v,
+        Args... args) : MutationPotential(model, std::forward<Args>(args)...),
+        u_(u), v_(v) { }
 
     virtual message_t Create(message_size_t n, any_t) override;
     virtual message_t Create(message_size_t n, some_t) override;
     virtual message_t Create(message_size_t n, mean_t) override;    
 
  protected:
-    float_t len_a_;
-    float_t len_b_;
+    float_t u_;
+    float_t v_;
+
+    struct Impl;
 };
 
 // Possible Potentials:

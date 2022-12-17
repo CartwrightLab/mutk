@@ -129,7 +129,7 @@ TEST_CASE("MutationModel.Constructor") {
 TEST_CASE("MutationModel.CreateTransitionMatrix") {
     using namespace boost::numeric::ublas;
     
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
@@ -170,7 +170,7 @@ TEST_CASE("MutationModel.CreateMeanMatrix") {
     using namespace boost::numeric::ublas;
     
     // TODO fix this test
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n);
         CAPTURE(k);
         CAPTURE(u);
@@ -216,7 +216,7 @@ TEST_CASE("MutationModel.CreateMeanMatrix") {
 TEST_CASE("MutationModel.CreateCountMatrix") {
     using namespace boost::numeric::ublas;
     
-    auto test = [&](size_t n, float u, float k) {
+    auto test = [&](size_t n, float u, float, float k) {
         CAPTURE(n); CAPTURE(k); CAPTURE(u);
 
         MutationModel model(k, 0.001, 0, 0, 0);

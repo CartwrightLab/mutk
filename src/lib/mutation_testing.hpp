@@ -57,18 +57,20 @@ struct kalleles_test_mat {
 
 template<typename F>
 void run_mutation_tests(F test) {
-    test(2, 0.0,  4.0);
-    test(4, 0.0,  4.0);
+    test(2, 0.0,  0.0, 4.0);
+    test(4, 0.0,  1e-8, 4.0);
 
-    test(1, 1e-8, 4.0);
-    test(2, 1e-8, 4.0);
-    test(3, 1e-8, 4.0);
-    test(4, 1e-8, 4.0);
-    
-    test(4, 1e-8, 4.0);
-    test(4, 1e-9, 5.0);
-    test(4, 1e-6, 6.0);
-    test(4, 1e-3, 7.0);
+    test(1, 1e-8, 4e-8, 4.0);
+    test(2, 1e-8, 3e-8, 4.0);
+    test(3, 1e-8, 2e-8, 4.0);
+    test(4, 1e-8, 1e-8, 4.0);
+    test(4, 1e-3, 1e-6, 4.0);
+    test(4, 1e-6, 1e-3, 4.0);
+
+    test(4, 1e-8, 1e-6, 4.0);
+    test(4, 1e-9, 1e-6, 5.0);
+    test(4, 1e-6, 1e-6, 6.0);
+    test(4, 1e-5, 1e-6, 7.0);
 }
 
 // for debugging purposes

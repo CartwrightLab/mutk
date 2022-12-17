@@ -12,5 +12,9 @@ CloningPotential.Create for Diploid-Diploid
 CloningPotential.Create for Diploid-Haploid
 CloningPotential.Create for Haploid-Diploid
 CloningPotential.Create for Haploid-Haploid
+SelfingPotential.Create for Diploid-Diploid
+SelfingPotential.Create for Diploid-Haploid
+SelfingPotential.Create for Haploid-Diploid
+SelfingPotential.Create for Haploid-Haploid
 version_number_check_equal
 version_integer
