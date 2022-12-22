@@ -5,6 +5,7 @@ MutationModel.Constructor
 MutationModel.CreateTransitionMatrix
 MutationModel.CreateMeanMatrix
 MutationModel.CreateCountMatrix
+MutationBuilder
 parse_newick
 Pedigree-parse_sex
 Pedigree-parse_text

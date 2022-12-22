@@ -104,6 +104,8 @@ class MutationPotential : public Potential {
     MutationModel model_;
 };
 
+
+
 class CloningPotential : public MutationPotential {
  public:
     template<typename... Args>
@@ -138,6 +140,25 @@ class SelfingPotential : public MutationPotential {
 
     struct Impl;
 };
+
+class MatingPotential : public MutationPotential {
+ public:
+    template<typename... Args>
+    MatingPotential(const MutationModel & model, float_t u, float_t v,
+        Args... args) : MutationPotential(model, std::forward<Args>(args)...),
+        u_(u), v_(v) { }
+
+    virtual message_t Create(message_size_t n, any_t) override;
+    virtual message_t Create(message_size_t n, some_t) override;
+    virtual message_t Create(message_size_t n, mean_t) override;    
+
+ protected:
+    float_t u_;
+    float_t v_;
+
+    struct Impl;
+};
+
 
 // Possible Potentials:
 // 2 x 2 -> 2 (selfing)

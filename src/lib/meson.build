@@ -9,7 +9,8 @@ libmutk_sources = files([
   'junction_tree.cpp',
   'potential.cpp',
   'potential-cloning.cpp',
-  'potential-selfing.cpp'
+  'potential-selfing.cpp',
+  'mutation_builder.cpp'
 ])
 
 libmutk_deps = [boost_dep, doctest_dep, eigen_dep, xtensor_dep, xblas_dep]
