@@ -43,11 +43,17 @@ triangulate_graph(const mutk::RelationshipGraph &graph);
 static std::vector<component_t>
 calculate_components(const mutk::RelationshipGraph &graph);
 
-mutk::GraphPeeler::GraphPeeler(mutk::RelationshipGraph graph) :
-    graph_{std::move(graph)}
-{
-    auto components = calculate_components(graph);
-    auto cliques = triangulate_graph(graph);
+mutk::GraphPeeler mutk::GraphPeeler::Create(mutk::RelationshipGraph graph) {
+    GraphPeeler peeler;
+
+    peeler.graph_ = std::move(graph);
+
+    auto components = calculate_components(peeler.graph_);
+    auto cliques = triangulate_graph(peeler.graph_);
+
+    peeler.tree_ = create_junction_tree(peeler.graph_, components, cliques);
+
+    return peeler;
 }
 
 // Triangulate a graph where the vertices are in topological order

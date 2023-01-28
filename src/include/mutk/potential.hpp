@@ -54,14 +54,14 @@ class Potential {
  public:
     using labels_t = boost::container::flat_set<message_label_t>;
 
-    Potential(labels_t labels) : labels_{std::move(labels)} {}
+    explicit Potential(labels_t labels) : labels_{std::move(labels)} {}
 
     template<class It>
     Potential(It first, It last) : labels_{first, last} {}
 
-    Potential(const std::vector<message_label_t> &seq) : Potential(seq.begin(), seq.end()) {}
+    explicit Potential(const std::vector<message_label_t> &seq) : Potential(seq.begin(), seq.end()) {}
 
-    Potential(std::initializer_list<message_label_t> init) : labels_{init} {}
+    explicit Potential(std::initializer_list<message_label_t> init) : labels_{init} {}
 
     virtual ~Potential() = default;
 

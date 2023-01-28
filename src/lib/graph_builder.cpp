@@ -25,15 +25,9 @@
 
 #include <iostream>
 
-// #include <boost/graph/copy.hpp>
 #include <boost/range/adaptor/reversed.hpp>
-// #include <boost/range/adaptor/filtered.hpp>
-// #include <boost/range/algorithm/count_if.hpp>
 #include <boost/algorithm/cxx11/all_of.hpp>
-// #include <boost/algorithm/cxx11/none_of.hpp>
-// #include <boost/algorithm/cxx11/one_of.hpp>
-// #include <boost/heap/d_ary_heap.hpp>
- #include <boost/graph/topological_sort.hpp>
+#include <boost/graph/topological_sort.hpp>
 
 #include <mutk/graph_builder.hpp>
 

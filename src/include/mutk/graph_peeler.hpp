@@ -40,7 +40,9 @@ struct workspace_t {
 
 class GraphPeeler {
 public:
-    explicit GraphPeeler(mutk::RelationshipGraph graph);
+    GraphPeeler() = default;
+
+    static GraphPeeler Create(RelationshipGraph graph);
 
     float PeelForward(workspace_t &work) const;
 
