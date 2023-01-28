@@ -1,5 +1,5 @@
 /*
-# Copyright (c) 2022 Reed A. Cartwright <racartwright@gmail.com>
+# Copyright (c) 2023 Reed A. Cartwright <racartwright@gmail.com>
 #
 # This file is part of the Ultimate Source Code Project.
 #
@@ -22,46 +22,27 @@
 # SOFTWARE.
 */
 
-#ifndef MUTK_INHERITANCE_MODEL_HPP
-#define MUTK_INHERITANCE_MODEL_HPP
+// NOTE: This header is in the lib directory because it is not part of the
+// public API at this time.
 
-#include <type_traits>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
+#ifndef MUTK_JUNCTION_TREE_HPP
+#define MUTK_JUNCTION_TREE_HPP
 
-namespace mutk {
+#include <mutk/graph.hpp>
 
-class GraphBuilder;
-
-class InheritanceModel {
- public:
-    InheritanceModel();
-
-    enum struct chromosome_type_t : int {};
-
-    chromosome_type_t AddType(std::string_view name, int ploidy);
-
- private:
-    std::vector<std::string> sexes_;
-    std::unordered_map<std::string, chromosome_type_t> map_name_to_type_;
-
-    std::vector<int> ploidies_;
-
-    struct pattern_t {
-        std::vector<chromosome_type_t> pattern;
-        std::vector<int> discard;
-    };
-
-    std::vector<pattern_t> patterns_;
-
-    friend class GraphBuilder;
+namespace mutk::junction_tree {
+struct component_t {
+    std::vector<mutk::variable_t> variables;
+    std::vector<float> edge_lengths;
 };
 
-constexpr auto operator+(InheritanceModel::chromosome_type_t value) {
-    return static_cast<std::underlying_type_t<InheritanceModel::chromosome_type_t>>(value);
+using clique_t = std::vector<mutk::RelationshipGraph::vertex_descriptor>;
+
+mutk::JunctionTree
+create_junction_tree(const mutk::RelationshipGraph &graph,
+    const std::vector<component_t> &components,
+    const std::vector<clique_t> &elimination_order);
+
 }
 
-} // namespace mutk
-
-#endif
+#endif // MUTK_JUNCTION_TREE_HPP

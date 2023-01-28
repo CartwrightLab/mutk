@@ -1,5 +1,5 @@
 /*
-# Copyright (c) 2022 Reed A. Cartwright <racartwright@gmail.com>
+# Copyright (c) 2023 Reed A. Cartwright <racartwright@gmail.com>
 #
 # This file is part of the Ultimate Source Code Project.
 #
@@ -23,6 +23,7 @@
 */
 
 #include "unit_testing.hpp"
+#include "junction_tree.hpp"
 
 #include <iostream>
 
@@ -34,20 +35,10 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 
-#include "mutk/graph_builder.hpp"
+#include <mutk/graph.hpp>
 
-template<class G>
-auto make_vertex_range(G &graph) {
-    return boost::make_iterator_range(vertices(graph));
-}
-
-template<class G>
-auto make_adj_vertex_range(typename G::vertex_descriptor v,  G &graph) {
-    return boost::make_iterator_range(adjacent_vertices(v, graph));
-}
-
-using mutk::component_t;
-using mutk::clique_t;
+using mutk::junction_tree::component_t;
+using mutk::junction_tree::clique_t;
 
 using vertex_set_t = boost::container::flat_set<int, std::less<int>,
     boost::container::small_vector<int, 4>>;
@@ -152,8 +143,8 @@ find_best_connection(vertex_t root, vertex_t query, const directed_tree_t & grap
     return result;
 }
 
-mutk::relationship_graph::JunctionTree
-mutk::create_junction_tree(const mutk::relationship_graph::Graph &graph,
+mutk::JunctionTree
+mutk::junction_tree::create_junction_tree(const mutk::RelationshipGraph &graph,
     const std::vector<component_t> &potentials,
     const std::vector<clique_t> &elimination_order) {
 
@@ -313,7 +304,7 @@ mutk::create_junction_tree(const mutk::relationship_graph::Graph &graph,
     }
 
     // Create Junction Tree in reverse topological order
-    mutk::relationship_graph::JunctionTree output(num_vertices(active_tree));
+    mutk::JunctionTree output(num_vertices(active_tree));
     // Create Edges
     for(auto [ei, ei_end] = edges(active_tree); ei != ei_end; ++ei) {
         auto s = source(*ei, active_tree);
@@ -335,8 +326,8 @@ mutk::create_junction_tree(const mutk::relationship_graph::Graph &graph,
 
 // LCOV_EXCL_START
 TEST_CASE("create_junction_tree() constructs a junction tree.") {
-    using mutk::relationship_graph::Graph;
-    using mutk::relationship_graph::JunctionTree;
+    using mutk::RelationshipGraph;
+    using mutk::JunctionTree;
     using mutk::variable_t;
 
     auto mkpot = [](const std::initializer_list<int> & range) -> component_t {
@@ -379,7 +370,7 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
     };
 
     {
-        Graph graph(7);
+        RelationshipGraph graph(7);
         add_edge(0,2,graph);
         add_edge(1,2,graph);
         add_edge(2,3,graph);
@@ -423,13 +414,13 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
         CHECK_EQ_RANGES(get_labels(tree), expected_labels);
 
         std::vector<std::string> expected_edges = {
-            "4,2->4", "3,2->3", "2->4,2", "2->3,2", "2,1,0->2",
-            "6,5->6", "1,0->2,1,0", "1,0->1", "0->1,0", "5->6,5"
+            "2,1,0->2", "3,2->3", "4,2->4", "6,5->6", "0->1,0",
+            "2->4,2", "2->3,2", "5->6,5", "1,0->2,1,0", "1,0->1"
         };
         CHECK_EQ_RANGES(get_edges(tree), expected_edges);
     }
     {
-        Graph graph(5);
+        RelationshipGraph graph(5);
         add_edge(0,1,graph);
         add_edge(0,2,graph);
         add_edge(0,3,graph);
@@ -461,13 +452,13 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
         CHECK_EQ_RANGES(get_labels(tree), expected_labels);
 
         std::vector<std::string> expected_edges = {
-            "1,0->1", "2,0->2", "3,0->3", "4,0->4", "0->2,0",
-            "0->1,0", "0->0", "0->3,0", "0->0", "0->4,0"
+            "1,0->1", "2,0->2", "3,0->3", "4,0->4", "0->0", "0->4,0",
+            "0->0", "0->3,0", "0->2,0", "0->1,0"
         };
         CHECK_EQ_RANGES(get_edges(tree), expected_edges);
     }
     {   // FIRST COUSIN MARRIAGE
-        Graph graph(9);
+        RelationshipGraph graph(9);
         add_edge(0,3,graph);
         add_edge(1,3,graph);
         add_edge(0,4,graph);
@@ -516,10 +507,12 @@ TEST_CASE("create_junction_tree() constructs a junction tree.") {
         CHECK_EQ_RANGES(get_labels(tree), expected_labels);
 
         std::vector<std::string> expected_edges = {
-            "8,7,6->8", "7,6->8,7,6", "7,6->7", "5,7,4->5", "7,4->5,7,4", "7,4->4",
-            "7,6,4->7,6", "7,6,4->7,4", "6,4->7,6,4", "6,4->6", "2,6,3->2", "6,3->2,6,3",
-            "6,3->3", "6,4,3->6,4", "6,4,3->6,3", "4,3->6,4,3", "4,3,1,0->4,1,0",
-            "4,3,1,0->4,3", "3,1,0->4,3,1,0", "1,0->3,1,0", "1,0->1", "0->1,0"
+            "3,1,0->4,3,1,0", "2,6,3->2", "5,7,4->5", "8,7,6->8",
+            "0->1,0", "7,6->8,7,6", "7,6->7", "7,4->5,7,4", "7,4->4",
+            "6,3->2,6,3", "6,3->3", "7,6,4->7,6", "7,6,4->7,4",
+            "6,4->7,6,4", "6,4->6", 
+            "6,4,3->6,4", "6,4,3->6,3", "4,3->6,4,3", "4,3,1,0->4,1,0",
+            "4,3,1,0->4,3", "1,0->3,1,0", "1,0->1"
         };
         CHECK_EQ_RANGES(get_edges(tree), expected_edges);        
     }

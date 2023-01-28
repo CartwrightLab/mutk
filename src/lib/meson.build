@@ -6,6 +6,7 @@ libmutk_sources = files([
   'newick.cpp',
   'mutation.cpp',
   'graph_builder.cpp',
+  'graph_peeler.cpp',
   'junction_tree.cpp',
   'potential.cpp',
   'potential-cloning.cpp',

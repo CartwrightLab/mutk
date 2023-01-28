@@ -75,9 +75,9 @@ public:
 
     explicit MutationBuilder(std::vector<int> ploidies) : ploidies_{std::move(ploidies)} {
         if(!ploidies_.empty()) {
-            child_ploidy_ = ploidies_[0];
-            parents_ploidy_ = std::accumulate(std::next(ploidies_.begin()),
-                ploidies_.end(), parents_ploidy_);
+            child_ploidy_ = ploidies_.back();
+            parents_ploidy_ = std::accumulate(ploidies_.begin(),
+                ploidies_.end(), parents_ploidy_) - child_ploidy_;
             transitions_.resize(child_ploidy_);
         }
     }
@@ -139,10 +139,10 @@ auto MutationBuilder<T>::Create(int n) const -> message_type {
     std::vector<int> coords(child_ploidy_+parents_ploidy_, 0);
 
     std::vector<std::pair<BidirIt,BidirIt>> partitions;
-    int pos = 0;
-    for(int p : ploidies_) {
-        partitions.emplace_back(coords.begin()+pos, coords.begin()+pos+p);
-        pos += p;
+    int pos = parents_ploidy_+child_ploidy_;
+    for(auto it = ploidies_.rbegin(); it != ploidies_.rend(); ++it) {
+        pos -= *it;
+        partitions.emplace_back(coords.begin()+pos, coords.begin()+pos+*it);
     }
 
     auto do_permute = [&](auto &val) {
@@ -162,7 +162,8 @@ auto MutationBuilder<T>::Create(int n) const -> message_type {
                 for(int x = 0; x < child_ploidy_; ++x) {
                     auto value = mutation_type::Zero();
                     for(auto &&par : transitions_[x]) {
-                        value = mutation_type::Plus(value, par.mu(coords[x], coords[par.parent], par.weight));
+                        value = mutation_type::Plus(value, par.mu(coords[x+parents_ploidy_],
+                            coords[par.parent], par.weight));
                     }
                     temp = mutation_type::Times(temp, value);
                 }
@@ -181,9 +182,10 @@ template<class T>
 auto MutationBuilder<T>::Shape(int n) const -> message_type::shape_type {
     message_type::shape_type ret;
     for(auto v : ploidies_) {
-        ret.push_back(boost::math::binomial_coefficient<double>(n+v-1, v));
+        if(v > 0) {
+            ret.push_back(boost::math::binomial_coefficient<double>(n+v-1, v));
+        }
     }
-    std::reverse(ret.begin(), ret.end());
     return ret;
 }
 
@@ -195,8 +197,10 @@ TEST_CASE("MutationBuilder") {
     {
         Builder builder({2,2});
 
-        builder.AddTransition(0, 2, 1.0, MutationSemiring(4,0.001));
-        builder.AddTransition(1, 3, 1.0, MutationSemiring(4,0.001));
+        builder.AddTransition(0, 0, 1.0, MutationSemiring(4,0.001));
+        builder.AddTransition(1, 1, 1.0, MutationSemiring(4,0.001));
+
+        auto msg = builder.Create(4);
 
         double k = 4;
         double u = 0.001;
@@ -225,23 +229,24 @@ TEST_CASE("MutationBuilder") {
             }
         }
 
-        auto msg = builder.Create(4);
+        CHECK(msg.shape() == expected.shape());
         CHECK_EQ_RANGES(msg, expected);
     }
     {
-        Builder builder({0,2,2});
+        Builder builder({2,2,0});
 
         auto expected = mutk::message_t::from_shape({10,10});
         expected.fill(1.0);
         auto msg = builder.Create(4);
+        CHECK(msg.shape() == expected.shape());
         CHECK_EQ_RANGES(msg, expected);
     }
     {
-        Builder builder({2,2,1});
+        Builder builder({2,1,2});
 
-        builder.AddTransition(0, 2, 0.5, MutationSemiring(4,0.0001));
-        builder.AddTransition(0, 3, 0.5, MutationSemiring(4,0.0001));
-        builder.AddTransition(1, 4, 1.0, MutationSemiring(4,0.001));
+        builder.AddTransition(0, 0, 0.5, MutationSemiring(4,0.0001));
+        builder.AddTransition(0, 1, 0.5, MutationSemiring(4,0.0001));
+        builder.AddTransition(1, 2, 1.0, MutationSemiring(4,0.001));
 
         auto msg = builder.Create(2);
 
@@ -254,7 +259,7 @@ TEST_CASE("MutationBuilder") {
         double pijv = -1.0/k*expm1(-beta*v);
         double piiv = exp(-beta*v) + pijv;
 
-        auto expected = mutk::message_t::from_shape({2,3,3});
+        auto expected = mutk::message_t::from_shape({3,2,3});
 
         int n = 2;
         for(int a=0,i=0;a<n;++a) {
@@ -262,7 +267,7 @@ TEST_CASE("MutationBuilder") {
                 for(int c=0,j=0;c<n;++c,++j) {
                     for(int x=0,k=0;x<n;++x) {
                         for(int y=0;y<=x;++y,++k) {
-                            // ab -> xy
+                            // ab -> x * c -> y
                             double ax = (a == x) ? piiu : piju;
                             double bx = (b == x) ? piiu : piju;
                             double abx = 0.5*(ax+bx);
@@ -275,13 +280,16 @@ TEST_CASE("MutationBuilder") {
                                 cy = (c == x) ? piiv : pijv;
                                 ret += abx*cy;
                             }
-                            expected(j,i,k) = ret;
+                            expected(i,j,k) = ret;
                         }
                     }
                 }
             }
         }
 
+        // 00 x 0 -> 01
+
+        CHECK(msg.shape() == expected.shape());
         CHECK_EQ_RANGES(msg, expected);
     }
 

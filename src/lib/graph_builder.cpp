@@ -25,47 +25,22 @@
 
 #include <iostream>
 
-#include <boost/graph/copy.hpp>
+// #include <boost/graph/copy.hpp>
 #include <boost/range/adaptor/reversed.hpp>
-#include <boost/range/adaptor/filtered.hpp>
-#include <boost/range/algorithm/count_if.hpp>
+// #include <boost/range/adaptor/filtered.hpp>
+// #include <boost/range/algorithm/count_if.hpp>
 #include <boost/algorithm/cxx11/all_of.hpp>
-#include <boost/algorithm/cxx11/none_of.hpp>
-#include <boost/algorithm/cxx11/one_of.hpp>
-#include <boost/heap/d_ary_heap.hpp>
-#include <boost/graph/topological_sort.hpp>
+// #include <boost/algorithm/cxx11/none_of.hpp>
+// #include <boost/algorithm/cxx11/one_of.hpp>
+// #include <boost/heap/d_ary_heap.hpp>
+ #include <boost/graph/topological_sort.hpp>
 
-#include "mutk/graph_builder.hpp"
-
-template<class G>
-auto make_vertex_range(G &graph) {
-    return boost::make_iterator_range(vertices(graph));
-}
-
-template<class G>
-auto make_adj_vertex_range(typename G::vertex_descriptor v,  G &graph) {
-    return boost::make_iterator_range(adjacent_vertices(v, graph));
-}
-
-template<class G>
-auto make_inv_vertex_range(typename G::vertex_descriptor v,  G &graph) {
-    return boost::make_iterator_range(inv_adjacent_vertices(v, graph));
-}
+#include <mutk/graph_builder.hpp>
 
 using mutk::member_id_t;
 
-using mutk::component_t;
-
-using mutk::clique_t;
-
-static mutk::relationship_graph::Graph
-simplify_graph(mutk::relationship_graph::Graph &graph);
-
-static std::vector<clique_t>
-triangulate_graph(const mutk::relationship_graph::Graph &graph);
-
-static std::vector<component_t>
-calculate_components(const mutk::relationship_graph::Graph &graph);
+static mutk::RelationshipGraph
+simplify_graph(mutk::RelationshipGraph &graph);
 
 // Convert `name` into a member id. If `name` is already registered, it
 // return the registered id number. Otherwise add `name` to the registry.
@@ -120,7 +95,7 @@ member_id_t mutk::GraphBuilder::AddTrio(const std::string &name, const std::stri
     return child_id;
 }
 
-void mutk::GraphBuilder::AddSamples(const std::vector<std::string> &sample_names) {
+void mutk::GraphBuilder::SetSamples(const std::vector<std::string> &sample_names) {
     sample_names_ = sample_names;
     map_sample_name_to_id_.clear();
     for(size_t i=0; i < sample_names.size(); ++i) {
@@ -128,25 +103,15 @@ void mutk::GraphBuilder::AddSamples(const std::vector<std::string> &sample_names
     }
 }
 
-void mutk::GraphBuilder::BuildGraph(const InheritanceModel &model, float mu) {
-    using mutk::relationship_graph::Graph;
-    static_assert(std::is_integral_v<Graph::vertex_descriptor>);
+mutk::RelationshipGraph mutk::GraphBuilder::BuildGraph(const InheritanceModel &model, float mu) {
+    static_assert(std::is_integral_v<RelationshipGraph::vertex_descriptor>);
 
     auto initial_graph = CreateInitialGraph(model, mu);
-
-    auto graph = simplify_graph(initial_graph);
-
-    auto components = calculate_components(graph);
-
-    auto cliques = triangulate_graph(graph);
-
-
+    return simplify_graph(initial_graph);
 }
 
-mutk::relationship_graph::Graph mutk::GraphBuilder::CreateInitialGraph(const InheritanceModel &model, float mu) {
-    using mutk::relationship_graph::Graph;
-
-    Graph graph(member_counter_);
+mutk::RelationshipGraph mutk::GraphBuilder::CreateInitialGraph(const InheritanceModel &model, float mu) {
+    RelationshipGraph graph(member_counter_);
 
     auto data = get(boost::vertex_data, graph);
     auto ploidies = get(boost::vertex_ploidy, graph);
@@ -222,13 +187,13 @@ mutk::relationship_graph::Graph mutk::GraphBuilder::CreateInitialGraph(const Inh
 //  0 -> 0; . -> .
 //  2 -> 1; aa -> a
 
-mutk::relationship_graph::Graph
-simplify_graph(mutk::relationship_graph::Graph &graph) {
-    using Graph = mutk::relationship_graph::Graph;
+mutk::RelationshipGraph
+simplify_graph(mutk::RelationshipGraph &graph) {
     using boost::make_iterator_range;
+    using mutk::RelationshipGraph;
 
     // Topologically sort members in reverse order
-    std::vector<Graph::vertex_descriptor> rev_topo_order;
+    std::vector<RelationshipGraph::vertex_descriptor> rev_topo_order;
     topological_sort(graph, std::back_inserter(rev_topo_order));
     auto topo_order = boost::adaptors::reverse(rev_topo_order);
 
@@ -280,14 +245,14 @@ simplify_graph(mutk::relationship_graph::Graph &graph) {
     }
 
     // Construct new graph in topological order
-    Graph new_graph;
+    RelationshipGraph new_graph;
 
     auto vertex_all_in = get(boost::vertex_all, graph);
     auto vertex_all_out = get(boost::vertex_all, new_graph);
     auto edge_all_in = get(boost::edge_all, graph);
     auto edge_all_out = get(boost::edge_all, new_graph);
 
-    std::vector<Graph::vertex_descriptor> old_to_new_vertex(num_vertices(graph));
+    std::vector<RelationshipGraph::vertex_descriptor> old_to_new_vertex(num_vertices(graph));
     for(auto o : topo_order) {
         if(degree(o, graph) == 0 && data[o].size() == 0) {
             continue;
@@ -309,11 +274,11 @@ simplify_graph(mutk::relationship_graph::Graph &graph) {
 
 // LCOV_EXCL_START
 TEST_CASE("simplify_graph() simplifies relationship graphs") {
-    using mutk::relationship_graph::Graph;
+    using mutk::RelationshipGraph;
     using mutk::sample_id_t;
 
-    auto get_length = [](Graph::vertex_descriptor a, Graph::vertex_descriptor b,
-        const Graph &g) -> float {
+    auto get_length = [](RelationshipGraph::vertex_descriptor a, RelationshipGraph::vertex_descriptor b,
+        const RelationshipGraph &g) -> float {
         auto e = edge(a,b,g);
         if(e.second) {
             return get(boost::edge_length, g, e.first);
@@ -321,12 +286,12 @@ TEST_CASE("simplify_graph() simplifies relationship graphs") {
         return NAN;
     };
 
-    auto get_name = [](Graph::vertex_descriptor a, const Graph &g) -> std::string {
+    auto get_name = [](RelationshipGraph::vertex_descriptor a, const RelationshipGraph &g) -> std::string {
         return get(boost::vertex_label, g, a);
     };
 
     {   // STANDARD TRIO
-        Graph graph(3);
+        RelationshipGraph graph(3);
         add_edge(0,2,0.5f,graph);
         add_edge(1,2,1.0f,graph);
 
@@ -352,7 +317,7 @@ TEST_CASE("simplify_graph() simplifies relationship graphs") {
         CHECK(get_length(1,2,out_graph) == 0.5f);
     }
     {   // TRIO WITH NO CHILD DATA
-        Graph graph(3);
+        RelationshipGraph graph(3);
         add_edge(0,2,0.5f,graph);
         add_edge(1,2,1.0f,graph);
 
@@ -373,7 +338,7 @@ TEST_CASE("simplify_graph() simplifies relationship graphs") {
         CHECK(num_edges(out_graph) == 0);
     }
     {   // TRIO WITH NO PARENT DATA
-        Graph graph(3);
+        RelationshipGraph graph(3);
         add_edge(0,2,0.5f,graph);
         add_edge(1,2,1.0f,graph);
 
@@ -393,7 +358,7 @@ TEST_CASE("simplify_graph() simplifies relationship graphs") {
         CHECK(num_edges(out_graph) == 0);
     }
     {   // TRIO WITH EXTRA NODE
-        Graph graph(4);
+        RelationshipGraph graph(4);
         add_edge(0,2,0.5f,graph);
         add_edge(1,2,1.0f,graph);
         add_edge(2,3,0.1f,graph);
@@ -421,7 +386,7 @@ TEST_CASE("simplify_graph() simplifies relationship graphs") {
         CHECK(get_length(1,2,out_graph) == 0.6f);
     }
     {   // MONOZYGOTIC TWINS
-        Graph graph(5);
+        RelationshipGraph graph(5);
         add_edge(0,2,0.5f,graph);
         add_edge(1,2,1.0f,graph);
         add_edge(2,3,0.1f,graph);
@@ -459,171 +424,4 @@ TEST_CASE("simplify_graph() simplifies relationship graphs") {
 // LCOV_EXCL_STOP
 
 
-// Triangulate a graph where the vertices are in topological order
-//
-// Almond and Kong (1991) Optimality Issues in Constructing a Markov Tree from Graphical Models.
-//     Research Report 329. University of Chicago, Dept. of Statistics
-static std::vector<clique_t>
-triangulate_graph(const mutk::relationship_graph::Graph &graph) {
-    using LocalGraph = boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS>;
 
-    // Build up new graph
-    LocalGraph local_graph(num_vertices(graph));
-    for(auto v : make_vertex_range(graph)) {
-        // add child vertex and link up all family members
-        auto inv_range = make_inv_vertex_range(v, graph);
-        for(auto w : inv_range) {
-            add_edge(w, v, local_graph);
-        }
-        for(auto it = std::begin(inv_range); it != std::end(inv_range); ++it) {
-            for(auto jt = std::next(it); jt != std::end(inv_range); ++jt) {
-                add_edge(*it, *jt, local_graph);
-            }
-        }
-    }
-
-    auto fill_in_count = [](LocalGraph::vertex_descriptor v, const LocalGraph &g) {
-        int fill = 0;
-        auto adj_range = make_adj_vertex_range(v, g);
-        for(auto it = std::begin(adj_range); it != std::end(adj_range); ++it) {
-            for(auto jt = std::next(it); jt != std::end(adj_range); ++jt) {
-                auto val = edge(*it, *jt, g);
-                fill += !val.second;
-            }
-        }
-        // return negative fill in because we are using a max heap
-        return -fill;
-    };
-    using heap_value_t = std::pair<int, LocalGraph::vertex_descriptor>;
-    using heap_t = boost::heap::d_ary_heap<heap_value_t,
-        boost::heap::arity<2>, boost::heap::mutable_<true>>;
-
-    heap_t priority_queue;
-
-    std::vector<heap_t::handle_type> handles(num_vertices(graph));
-
-    for(auto v : make_vertex_range(local_graph)) {
-        int cost = fill_in_count(v, local_graph);
-        auto handle = priority_queue.push({cost, v});
-        handles[v] = handle;
-    }
-
-    std::vector<clique_t> elim_order;
-
-    while(!priority_queue.empty()) {
-        // chose next vertex to eliminate and remove it from the queue
-        auto value = priority_queue.top();
-        priority_queue.pop();
-
-        // record the vertex
-        auto v = value.second;
-        auto & clique = elim_order.emplace_back();
-        clique.push_back(v);
-        // record neighbors
-        for(auto n : make_adj_vertex_range(v, local_graph)) {
-            clique.push_back(n);
-        }
-        // clear vertex
-        clear_vertex(v, local_graph);
-
-        // link up neighbors
-        std::set<LocalGraph::vertex_descriptor> dirty_vertices;
-        for(auto it = std::next(clique.begin()); it != clique.end(); ++it) {
-            for(auto jt = std::next(it); jt != clique.end(); ++jt) {
-                add_edge(*it, *jt, local_graph);
-            }
-            // keep track of vertices that need to be recalculated
-            dirty_vertices.insert(*it);
-            for(auto n : make_adj_vertex_range(*it, local_graph)) {
-                dirty_vertices.insert(n);
-            }
-        }
-        // Update the priority queue
-        for(auto v : dirty_vertices) {
-            (*handles[v]).first = fill_in_count(v, local_graph);
-            priority_queue.update(handles[v]);
-        }
-    }
-
-    return elim_order;
-}
-
-// LCOV_EXCL_START
-TEST_CASE("triangulate_graph() identifies cliques") {
-    using mutk::relationship_graph::Graph;
-    using mutk::sample_id_t;
-
-    {   
-        Graph graph(9);
-        add_edge(0,3,graph);
-        add_edge(1,3,graph);
-        add_edge(0,4,graph);
-        add_edge(1,4,graph);
-        add_edge(2,6,graph);
-        add_edge(3,6,graph);
-        add_edge(4,7,graph);
-        add_edge(5,7,graph);
-        add_edge(6,8,graph);
-        add_edge(7,8,graph);
-
-        auto cliques = triangulate_graph(graph);
-
-        REQUIRE(cliques.size() == 9);
-        CHECK(cliques[0] == clique_t({8,6,7}));
-        CHECK(cliques[1] == clique_t({5,4,7}));
-        CHECK(cliques[2] == clique_t({2,3,6}));
-        CHECK(cliques[3] == clique_t({7,4,6}));
-        CHECK(cliques[4] == clique_t({6,3,4}));
-        CHECK(cliques[5] == clique_t({4,0,1,3}));
-        CHECK(cliques[6] == clique_t({3,0,1}));
-        CHECK(cliques[7] == clique_t({1,0}));
-        CHECK(cliques[8] == clique_t({0}));
-    }
-    {
-        Graph graph(7);
-        add_edge(0,2,graph);
-        add_edge(1,2,graph);
-        add_edge(2,3,graph);
-        add_edge(2,4,graph);
-        add_edge(5,6,graph);
-
-        auto cliques = triangulate_graph(graph);
-        REQUIRE(cliques.size() == 7);
-        CHECK(cliques[0] == clique_t({6,5}));
-        CHECK(cliques[1] == clique_t({5}));
-        CHECK(cliques[2] == clique_t({4,2}));
-        CHECK(cliques[3] == clique_t({3,2}));
-        CHECK(cliques[4] == clique_t({2,0,1}));
-        CHECK(cliques[5] == clique_t({1,0}));
-        CHECK(cliques[6] == clique_t({0}));
-    }
-}
-// LCOV_EXCL_STOP
-
-std::vector<component_t>
-calculate_components(const mutk::relationship_graph::Graph &graph) {
-    using mutk::variable_t;
-
-    std::vector<component_t> components;
-
-    for(auto v : make_vertex_range(graph)) {
-        {
-            // Add a potential for this single node
-            auto & pot = components.emplace_back();
-            pot.variables.push_back(variable_t(v));
-            pot.edge_lengths.push_back(0.0f);
-        }
-        if(in_degree(v,graph) > 0) {
-            // Add a potential for this family
-            auto & pot = components.emplace_back();
-            pot.variables.push_back(variable_t(v));
-            pot.edge_lengths.push_back(0.0f);
-            for(auto e : boost::make_iterator_range(in_edges(v,graph))) {
-                pot.variables.push_back(variable_t(source(e, graph)));
-                pot.edge_lengths.push_back(get(boost::edge_length, graph, e));
-            }
-        }
-    }
-
-    return components;
-}

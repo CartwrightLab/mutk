@@ -25,7 +25,6 @@
 #include "mutation_testing.hpp"
 
 #include <mutk/mutation.hpp>
-#include <mutk/relationship_graph.hpp>
 
 namespace {
 constexpr int ALLELE[][2] = {

@@ -1,5 +1,5 @@
 /*
-# Copyright (c) 2022 Reed A. Cartwright <racartwright@gmail.com>
+# Copyright (c) 2023 Reed A. Cartwright <racartwright@gmail.com>
 #
 # This file is part of the Ultimate Source Code Project.
 #
@@ -22,46 +22,54 @@
 # SOFTWARE.
 */
 
-#ifndef MUTK_INHERITANCE_MODEL_HPP
-#define MUTK_INHERITANCE_MODEL_HPP
+#ifndef MUTK_RELATIONSHIP_GRAPH_HPP
+#define MUTK_RELATIONSHIP_GRAPH_HPP
 
-#include <type_traits>
-#include <string_view>
-#include <unordered_map>
+#include "message.hpp"
+#include "graph.hpp"
+
+#include <cmath>
+#include <string>
 #include <vector>
 
 namespace mutk {
 
-class GraphBuilder;
-
-class InheritanceModel {
- public:
-    InheritanceModel();
-
-    enum struct chromosome_type_t : int {};
-
-    chromosome_type_t AddType(std::string_view name, int ploidy);
-
- private:
-    std::vector<std::string> sexes_;
-    std::unordered_map<std::string, chromosome_type_t> map_name_to_type_;
-
-    std::vector<int> ploidies_;
-
-    struct pattern_t {
-        std::vector<chromosome_type_t> pattern;
-        std::vector<int> discard;
-    };
-
-    std::vector<pattern_t> patterns_;
-
-    friend class GraphBuilder;
+struct workspace_t {
+    std::vector<mutk::message_t> messages;
 };
 
-constexpr auto operator+(InheritanceModel::chromosome_type_t value) {
-    return static_cast<std::underlying_type_t<InheritanceModel::chromosome_type_t>>(value);
-}
+class GraphPeeler {
+public:
+    explicit GraphPeeler(mutk::RelationshipGraph graph);
+
+    float PeelForward(workspace_t &work) const;
+
+    void PrintGraph(std::ostream &os) const;
+
+    //samples_t SampleNames() const;
+
+    workspace_t CreateWorkspace() const;
+
+    // const std::vector<potential_t>& potentials() const {
+    //     return potentials_;
+    // }
+
+    const auto & graph() const {
+        return graph_;
+    }
+
+    const auto & junction_tree() const {
+        return tree_;
+    }
+
+protected:
+    RelationshipGraph graph_;
+    JunctionTree tree_;
+
+private:
+
+};
 
 } // namespace mutk
 
-#endif
+#endif // MUTK_RELATIONSHIP_GRAPH_HPP

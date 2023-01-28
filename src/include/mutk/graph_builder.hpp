@@ -1,5 +1,5 @@
 /*
-# Copyright (c) 2022 Reed A. Cartwright <racartwright@gmail.com>
+# Copyright (c) 2023 Reed A. Cartwright <racartwright@gmail.com>
 #
 # This file is part of the Ultimate Source Code Project.
 #
@@ -32,72 +32,11 @@
 #include <boost/graph/adjacency_list.hpp>
 
 #include "inheritance_model.hpp"
+#include "graph.hpp"
 #include "potential.hpp"
 
-// Install boost graph properties
-namespace boost {
-enum edge_length_t { edge_length };
-enum edge_type_t { edge_type };
-
-enum vertex_label_t { vertex_label };
-enum vertex_data_t { vertex_data };
-enum vertex_ploidy_t { vertex_ploidy };
-
-BOOST_INSTALL_PROPERTY(edge, length);
-BOOST_INSTALL_PROPERTY(edge, type);
-
-BOOST_INSTALL_PROPERTY(vertex, label);
-BOOST_INSTALL_PROPERTY(vertex, data);
-BOOST_INSTALL_PROPERTY(vertex, ploidy);
-}
 
 namespace mutk {
-
-// A strongly-type int. Use unitary + to do a static cast.
-enum struct member_id_t : int {};
-constexpr auto operator+(member_id_t value) {
-    return static_cast<std::underlying_type_t<member_id_t>>(value);
-}
-enum struct sample_id_t : int {};
-constexpr auto operator+(sample_id_t value) {
-    return static_cast<std::underlying_type_t<sample_id_t>>(value);
-}
-namespace relationship_graph {
-
-namespace graph {
-
-using EdgeLengthProp = boost::property<boost::edge_length_t, float>;
-using EdgeProp = EdgeLengthProp;
-
-using VertexDataProp   = boost::property<boost::vertex_data_t, std::vector<sample_id_t>>;
-using VertexPloidyProp = boost::property<boost::vertex_ploidy_t, Ploidy, VertexDataProp>;
-using VertexLabelProp = boost::property<boost::vertex_label_t, std::string, VertexPloidyProp>;
-using VertexProp = VertexLabelProp;
-
-using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
-        VertexProp, EdgeProp>;
-}
-
-namespace junction_tree {
-
-using VertexLabelProp = boost::property<boost::vertex_label_t, std::vector<variable_t>>;
-using VertexProp = VertexLabelProp;
-
-using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
-        VertexProp, boost::no_property>;
-}
-
-using Graph = graph::Graph;
-using JunctionTree = junction_tree::Graph;
-
-}
-
-struct component_t {
-    std::vector<variable_t> variables;
-    std::vector<float> edge_lengths;
-};
-
-using clique_t = std::vector<mutk::relationship_graph::Graph::vertex_descriptor>;
 
 class GraphBuilder {
  public:
@@ -113,16 +52,16 @@ class GraphBuilder {
         const std::string &parent_name_a, float mutation_scale_a,
         const std::string &parent_name_b, float mutation_scale_b);
 
-    // Add known samples
-    void AddSamples(const std::vector<std::string> &sample_names);
+    // Set known samples
+    void SetSamples(const std::vector<std::string> &sample_names);
 
     // Build the final relationship graph based on an inhertiance model
-    void BuildGraph(const InheritanceModel &model, float mu);
+    RelationshipGraph BuildGraph(const InheritanceModel &model, float mu);
 
  private:
     member_id_t LookupName(const std::string &name);
 
-    relationship_graph::Graph CreateInitialGraph(const InheritanceModel &model, float mu);
+    RelationshipGraph CreateInitialGraph(const InheritanceModel &model, float mu);
 
     struct family_t {
         std::vector<member_id_t> members;
@@ -142,12 +81,6 @@ class GraphBuilder {
 
     std::vector<family_t> families_;
 };
-
-
-mutk::relationship_graph::JunctionTree
-create_junction_tree(const mutk::relationship_graph::Graph &graph,
-    const std::vector<component_t> &components,
-    const std::vector<clique_t> &elimination_order);
 
 }
 

@@ -24,7 +24,7 @@ cblas_dep   = dependency('cblas')
 subdir('include')
 subdir('lib')
 
-progs=['version', 'genseed', 'graph'] #'modelfit'
+progs=['version', 'genseed'] #'modelfit' 'graph'
 
 foreach p : progs
   exe = executable('mutk-@0@'.format(p), ['mutk-@0@.cpp'.format(p), version_file],
