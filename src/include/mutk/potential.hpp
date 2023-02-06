@@ -79,7 +79,13 @@ class Potential {
     static constexpr some_t ONE{1};
     static constexpr some_t TWO{2};
 
-    message_t::shape_type Shape(int n) const;
+   inline
+   message_t::shape_type Shape(int n) const {
+       message_t::shape_type ret(labels_.size());
+       std::transform(labels_.begin(), labels_.end(), ret.begin(),
+           [n](auto v) { return message_axis_size(n,v); });
+       return ret;
+   }
 
  protected:
     labels_t labels_;
@@ -105,61 +111,6 @@ class MutationPotential : public Potential {
 };
 
 
-
-class CloningPotential : public MutationPotential {
- public:
-    template<typename... Args>
-    CloningPotential(const MutationModel & model,
-        float_t u, Args... args) : MutationPotential(model, std::forward<Args>(args)...),
-        u_(u) { }
-
-    virtual message_t Create(message_size_t n, any_t val) override;
-    virtual message_t Create(message_size_t n, some_t) override;
-    virtual message_t Create(message_size_t n, mean_t) override;    
-
- protected:
-    float_t u_;
-
-    struct Impl;
-};
-
-class SelfingPotential : public MutationPotential {
- public:
-    template<typename... Args>
-    SelfingPotential(const MutationModel & model, float_t u, float_t v,
-        Args... args) : MutationPotential(model, std::forward<Args>(args)...),
-        u_(u), v_(v) { }
-
-    virtual message_t Create(message_size_t n, any_t) override;
-    virtual message_t Create(message_size_t n, some_t) override;
-    virtual message_t Create(message_size_t n, mean_t) override;    
-
- protected:
-    float_t u_;
-    float_t v_;
-
-    struct Impl;
-};
-
-class MatingPotential : public MutationPotential {
- public:
-    template<typename... Args>
-    MatingPotential(const MutationModel & model, float_t u, float_t v,
-        Args... args) : MutationPotential(model, std::forward<Args>(args)...),
-        u_(u), v_(v) { }
-
-    virtual message_t Create(message_size_t n, any_t) override;
-    virtual message_t Create(message_size_t n, some_t) override;
-    virtual message_t Create(message_size_t n, mean_t) override;    
-
- protected:
-    float_t u_;
-    float_t v_;
-
-    struct Impl;
-};
-
-
 // Possible Potentials:
 // 2 x 2 -> 2 (selfing)
 // 2 x 2 -> 1 (selfing)
@@ -181,13 +132,6 @@ class MatingPotential : public MutationPotential {
 // 1 -> 2
 // 1 -> 1
 
-inline
-message_t::shape_type Potential::Shape(int n) const {
-    message_t::shape_type ret(labels_.size());
-    std::transform(labels_.begin(), labels_.end(), ret.begin(),
-        [n](auto v) { return message_axis_size(n,v); });
-    return ret;
-}
 
 } // namespace mutk
 

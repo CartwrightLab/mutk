@@ -42,6 +42,10 @@ public:
 
     using value_type = double;
 
+    value_type operator()(int a, int b, double w) const {
+        return w * ((a==b) ? pii_ : pij_);
+    }
+
     static value_type One() { return 1.0; }
     static value_type Zero() { return 0.0; }
 
@@ -53,10 +57,6 @@ public:
     // Aggregation
     static value_type Times(value_type lhs, value_type rhs) {
         return lhs * rhs;
-    }
-
-    value_type operator()(int a, int b, double w) const {
-        return w * ((a==b) ? pii_ : pij_);
     }
 
 private:
@@ -192,7 +192,7 @@ auto MutationBuilder<T>::Shape(int n) const -> message_type::shape_type {
 TEST_CASE("MutationBuilder") {
     using Builder = MutationBuilder<MutationSemiring>;
 
-    using S = mutk::message_t::shape_type;
+    using S = mutk::message_t::shape_type; S{};
 
     {
         Builder builder({2,2});

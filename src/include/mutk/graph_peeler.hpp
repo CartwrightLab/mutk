@@ -46,9 +46,11 @@ public:
 
     float PeelForward(workspace_t &work) const;
 
-    void PrintGraph(std::ostream &os) const;
+    template<class Arg>
+    void SetModelPotentials(workspace_t &work, message_size_t n, Arg arg) const;
 
-    //samples_t SampleNames() const;
+    void SetDataPotentials(workspace_t &work, message_size_t n,
+        const std::vector<mutk::message_t> &data) const;
 
     workspace_t CreateWorkspace() const;
 
