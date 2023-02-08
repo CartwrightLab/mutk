@@ -97,7 +97,8 @@ class Probability {
 public:
     Probability(float_t k, float_t u) : k_(k), u_(u) {
         double beta = k_/(k_-1.0);
-        pij_ = -1.0/k_*expm1(-beta*u_);
+        double p = -expm1(-beta*u_);
+        pij_ = 1.0/k_*p;
         pii_ = exp(-beta*u_) + pij_;
     }
 
@@ -127,7 +128,51 @@ private:
     float_t pij_;
 };
 
+// https://www.cs.jhu.edu/~jason/papers/li+eisner.emnlp09.pdf
+// Value type is pair <p,r>
+//     p = P(j|i)
+//     r = E[num of mutations | i,j]*P(j|i)
+class Expectation {
+public:
+    Expectation(float_t k, float_t u) : k_(k), u_(u) {
+        double beta = k_/(k_-1.0);
+        double p = -expm1(-beta*u_);
 
+        pii_ = exp(-beta*u_) + 1.0/k_*p;
+        rii_ = p * u_/k_;
+
+        pij_ = 1.0/k_*p;
+        rij_ = (k_-p)/(k_-1.0) * u_/k_;
+    }
+
+    using value_type = std::array<float_t,2>;
+
+    value_type operator()(int a, int b, float_t w) const {
+        return ((a==b) ? value_type{w * pii_, w * rii_} :
+                         value_type{w * pij_, w * rij_});
+    }
+
+    static value_type One() { return {1.0,0.0}; }
+    static value_type Zero() { return {0.0,0.0}; }
+
+    // Combination
+    static value_type Plus(value_type lhs, value_type rhs) {
+        return {lhs[0] + rhs[0], lhs[1] + rhs[1]};
+    }
+
+    // Aggregation
+    static value_type Times(value_type lhs, value_type rhs) {
+        return {lhs[0]*rhs[0], lhs[0]*rhs[1] + rhs[0]*lhs[1]};
+    }
+
+private:
+    float_t k_;
+    float_t u_;
+    float_t pii_;
+    float_t rii_;
+    float_t pij_;
+    float_t rij_;
+};
 
 } // namespace mutation_semiring
 

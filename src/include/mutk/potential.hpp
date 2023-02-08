@@ -108,6 +108,8 @@ class MutationPotential : public Potential {
 
  protected:
     MutationModel model_;
+    MutationMessageBuilder<mutation_semiring::Probability> probability_builder_;
+    MutationMessageBuilder<mutation_semiring::Expectation> expectation_builder_;
 };
 
 
