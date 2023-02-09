@@ -110,6 +110,8 @@ class MutationPotential : public Potential {
     MutationModel model_;
     MutationMessageBuilder<mutation_semiring::Probability> probability_builder_;
     MutationMessageBuilder<mutation_semiring::Expectation> expectation_builder_;
+    MutationMessageBuilder<mutation_semiring::Counting<0>> zero_count_builder_;
+    MutationMessageBuilder<mutation_semiring::Counting<1>> one_count_builder_;
 };
 
 

@@ -108,8 +108,9 @@ public:
         return w * ((a==b) ? pii_ : pij_);
     }
 
-    static value_type One() { return 1.0; }
+
     static value_type Zero() { return 0.0; }
+    static value_type One() { return 1.0; }
 
     // Combination
     static value_type Plus(value_type lhs, value_type rhs) {
@@ -119,6 +120,11 @@ public:
     // Aggregation
     static value_type Times(value_type lhs, value_type rhs) {
         return lhs * rhs;
+    }
+
+    // Casting
+    static float_t AsFloat(value_type lhs) {
+        return lhs;
     }
 
 private:
@@ -152,8 +158,8 @@ public:
                          value_type{w * pij_, w * rij_});
     }
 
-    static value_type One() { return {1.0,0.0}; }
     static value_type Zero() { return {0.0,0.0}; }
+    static value_type One() { return {1.0,0.0}; }
 
     // Combination
     static value_type Plus(value_type lhs, value_type rhs) {
@@ -165,6 +171,11 @@ public:
         return {lhs[0]*rhs[0], lhs[0]*rhs[1] + rhs[0]*lhs[1]};
     }
 
+    // Casting
+    static float_t AsFloat(value_type lhs) {
+        return lhs[1];
+    }    
+
 private:
     float_t k_;
     float_t u_;
@@ -173,6 +184,80 @@ private:
     float_t pij_;
     float_t rij_;
 };
+
+
+// ret(i,j) = P(j & x mutations | i)
+//
+// beta = k/(k-1)
+// P(x mutations | i) = (t^x Exp[-t])/x!
+template<size_t N>
+class Counting {
+public:
+    Counting(float_t k, float_t u) : k_(k), u_(u) { }
+
+    using value_type = std::array<float_t, N+1>;
+
+    value_type operator()(int a, int b, float_t w) const {
+        // ret[k] = P(k mutations & a | b)
+        value_type ret;
+
+        for(size_t k = 0; k < ret.size(); ++k) {
+            // p_k = P(x mutations | b) = (u^k Exp[-u])/k!
+            double klogu = (k == 0 && u_ == 0.0) ? 0.0 : k*log(u_);
+            double p_k = exp(-u_+klogu-lgamma(k+1));
+
+            // Calculate P(a | b, x mutations) and put it all together
+            // Formula calculated using MatrixPower[] in Mathematica
+            // Can be proved using an induction proof.
+            double h = k_-1.0;
+            double alpha = pow(-1.0/h, k);
+            ret[k] = w * p_k * ((a == b) ? (1.0+h*alpha) : (1.0-alpha)) / k_;
+        }
+        return ret;
+    }
+
+    static value_type Zero() {
+        value_type ret;
+        ret.fill(0.0);
+        return ret;
+    }
+    static value_type One() {
+        value_type ret = Zero();
+        ret[0] = 1.0;
+        return ret;
+    }
+
+    // Combination
+    static value_type Plus(value_type lhs, value_type rhs) {
+        value_type ret;
+        for(size_t i = 0; i < ret.size(); ++i) {
+            ret[i] = lhs[i] + rhs[i];
+        }
+        return ret;
+    }
+
+    // Aggregation
+    static value_type Times(value_type lhs, value_type rhs) {
+        value_type ret;
+        for(size_t n = 0; n < ret.size(); ++n) {
+            ret[n] = lhs[0]*rhs[n];
+            for(size_t i = 1; i <= n; ++i) {
+                ret[n] += lhs[i]*rhs[n-i];
+            }
+        }
+        return ret;
+    }
+
+    // Casting
+    static float_t AsFloat(value_type lhs) {
+        return lhs[N];
+    }
+
+private:
+    float_t k_;
+    float_t u_;
+};
+
 
 } // namespace mutation_semiring
 
@@ -289,7 +374,7 @@ auto MutationMessageBuilder<T>::Create(int n) const -> message_type {
             counter += 1;
         } while(std::any_of(std::next(partitions.begin()), partitions.end(), do_next_order));
 
-        msg.flat(idx++) = total / counter;
+        msg.flat(idx++) = mutation_type::Cast(total) / counter;
     } while(std::any_of(partitions.begin(), partitions.end(), do_next_multiset));
 
     return msg;
