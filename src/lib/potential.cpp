@@ -42,3 +42,29 @@ message_t mutk::UnitPotential::Create(size_t n, some_t k) {
     }
     return xt::zeros<float_t>(Shape(n));
 }
+
+
+// ==== MUTATION POTENTIAL =====================================================
+
+message_t mutk::MutationPotential::Create(size_t n, any_t) {
+    return probability_builder_.Create(n);
+}
+
+message_t mutk::MutationPotential::Create(size_t n, mean_t) {
+    return expectation_builder_.Create(n);
+}
+
+message_t mutk::MutationPotential::Create(size_t n, some_t k) {
+    if(k == some_t{1}) {
+        return one_count_builder_.Create(n);
+    } else if(k != some_t{0}) {
+        // Not implemented
+        assert(false);
+    }
+    return zero_count_builder_.Create(n);
+}
+
+void mutk::MutationPotential::AddTransition(message_t::size_type child, message_t::size_type parent, double weight, double u) {
+    probability_builder_.AddTransition(child, parent, weight, {model_.k(), (float_t)u});
+}
+

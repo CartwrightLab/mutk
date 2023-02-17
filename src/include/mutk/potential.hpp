@@ -87,6 +87,15 @@ class Potential {
        return ret;
    }
 
+   inline
+   std::vector<int> Ploidies() const {
+      std::vector<int> ret;
+      for( auto && a : labels_) {
+         ret.push_back((int)message_axis_ploidy(a));
+      }
+      return ret;
+   }
+
  protected:
     labels_t labels_;
 };
@@ -104,7 +113,16 @@ class MutationPotential : public Potential {
  public:
     template<typename... Args>
     MutationPotential(const MutationModel & model, Args... args) : Potential(std::forward<Args>(args)...),
-        model_(model) { }
+        model_(model),
+        probability_builder_(Ploidies()), expectation_builder_(Ploidies()),
+        zero_count_builder_(Ploidies()), one_count_builder_(Ploidies())
+    { }
+
+    virtual message_t Create(message_size_t n, any_t) override;
+    virtual message_t Create(message_size_t n, some_t) override;
+    virtual message_t Create(message_size_t n, mean_t) override;
+
+   void AddTransition(message_t::size_type child, message_t::size_type parent, double weight, double u);
 
  protected:
     MutationModel model_;
@@ -114,6 +132,13 @@ class MutationPotential : public Potential {
     MutationMessageBuilder<mutation_semiring::Counting<1>> one_count_builder_;
 };
 
+inline
+void mutk::MutationPotential::AddTransition(message_t::size_type child, message_t::size_type parent, double weight, double u) {
+    probability_builder_.AddTransition(child, parent, weight, {model_.k(), (float_t)u});
+    expectation_builder_.AddTransition(child, parent, weight, {model_.k(), (float_t)u});
+    zero_count_builder_.AddTransition(child, parent, weight, {model_.k(), (float_t)u});
+    one_count_builder_.AddTransition(child, parent, weight, {model_.k(), (float_t)u});
+}
 
 // Possible Potentials:
 // 2 x 2 -> 2 (selfing)
