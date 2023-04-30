@@ -154,7 +154,7 @@ mutk::RelationshipGraph mutk::GraphBuilder::CreateInitialGraph(const Inheritance
                 "has invalid family pattern.");
         }
 
-        // Connect up all members of this component
+        // Connect parents to child
         auto child_id = family.members[0];
         for(size_t j = 1; j < family.members.size(); ++j) {
             member_id_t from = family.members[j];

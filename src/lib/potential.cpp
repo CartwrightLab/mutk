@@ -64,7 +64,3 @@ message_t mutk::MutationPotential::Create(size_t n, some_t k) {
     return zero_count_builder_.Create(n);
 }
 
-void mutk::MutationPotential::AddTransition(message_t::size_type child, message_t::size_type parent, double weight, double u) {
-    probability_builder_.AddTransition(child, parent, weight, {model_.k(), (float_t)u});
-}
-

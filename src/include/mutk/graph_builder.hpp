@@ -38,6 +38,15 @@
 
 namespace mutk {
 
+/*
+GraphBulder constructs a RelationShip graph based on 
+   - known samples (tips)
+   - trio relationships
+   - pair relationships
+   - singletons
+   - An inheritance model
+*/
+
 class GraphBuilder {
  public:
     GraphBuilder();
@@ -55,7 +64,7 @@ class GraphBuilder {
     // Set known samples
     void SetSamples(const std::vector<std::string> &sample_names);
 
-    // Build the final relationship graph based on an inhertiance model
+    // Build the final relationship graph based on an inheritance model
     RelationshipGraph BuildGraph(const InheritanceModel &model, float mu);
 
  private:

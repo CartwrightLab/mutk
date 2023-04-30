@@ -34,18 +34,18 @@
 
 namespace mutk {
 
-enum struct variable_t : unsigned int {};
+enum struct variable_t : int {};
 constexpr auto operator+(variable_t value) {
     return static_cast<std::underlying_type_t<variable_t>>(value);
 }
 
-enum struct Ploidy : unsigned int {
+enum struct Ploidy : int {
     Noploid = 0,
     Haploid = 1,
     Diploid = 2
 };
 
-enum struct message_label_t : unsigned int {};
+enum struct message_label_t : int {};
 
 constexpr
 message_label_t make_message_label(variable_t v, Ploidy p) {

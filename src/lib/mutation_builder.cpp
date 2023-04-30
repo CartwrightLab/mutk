@@ -29,176 +29,21 @@
 #include <iterator>
 #include <utility>
 #include <mutk/message.hpp>
+#include <mutk/mutation.hpp>
 
 #include <boost/math/special_functions/binomial.hpp>
 
-class MutationSemiring {
-public:
-    MutationSemiring(double k, double u) : k_(k), u_(u) {
-        double beta = k_/(k_-1.0);
-        pij_ = -1.0/k_*expm1(-beta*u_);
-        pii_ = exp(-beta*u_) + pij_;
-    }
-
-    using value_type = double;
-
-    value_type operator()(int a, int b, double w) const {
-        return w * ((a==b) ? pii_ : pij_);
-    }
-
-    static value_type One() { return 1.0; }
-    static value_type Zero() { return 0.0; }
-
-    // Combination
-    static value_type Plus(value_type lhs, value_type rhs) {
-        return lhs + rhs;
-    }
-
-    // Aggregation
-    static value_type Times(value_type lhs, value_type rhs) {
-        return lhs * rhs;
-    }
-
-private:
-    double k_;
-    double u_;
-    double pii_;
-    double pij_;
-};
-
-// Temporary Name
-template<class T>
-class MutationBuilder { 
-public:
-    using mutation_type = T;
-    using message_type = mutk::message_t;
-
-    explicit MutationBuilder(std::vector<int> ploidies) : ploidies_{std::move(ploidies)} {
-        if(!ploidies_.empty()) {
-            child_ploidy_ = ploidies_.back();
-            parents_ploidy_ = std::accumulate(ploidies_.begin(),
-                ploidies_.end(), parents_ploidy_) - child_ploidy_;
-            transitions_.resize(child_ploidy_);
-        }
-    }
-
-    void AddTransition(message_type::size_type child, message_type::size_type parent, double weight, mutation_type mu) {
-        transitions_[child].push_back({weight, parent, mu});
-    }
-
-    message_type::shape_type Shape(int n) const;
-
-    message_type Create(int n) const;
-
-private:
-    int child_ploidy_{0};
-    int parents_ploidy_{0};
-    std::vector<int> ploidies_;
-
-    struct transition_t {
-        double weight;
-        message_type::size_type parent;
-        mutation_type mu;
-    };
-
-    std::vector<std::vector<transition_t>> transitions_;
-};
-
-// If k goes from [0 to N)
-// The index for genotype k1 <= k2 <= ... <= kP is
-// Sum_{m=1}^P (kM+m-1) choose m
-
-// The number of possible genotypes with ploidy P and alleles N is
-// (N+P-1) choose P
-
-
-// Find right most minimum number. Increase that number by one. Set all values to the left of it to zero
-
-template<class BidirIt, class ValueType>
-bool next_multiset(BidirIt first, BidirIt last, ValueType n) {
-    if(first == last) {
-        return false;
-    }
-    auto it = std::find_if(first, last, [&](auto cit){ return *first < cit; });
-    std::advance(it, -1);
-    if(++(*it) == n) {
-        std::fill(first, last, 0);
-        return false;
-    }
-    std::fill(first, it, 0);
-    return true;
-}
-
-template<class T>
-auto MutationBuilder<T>::Create(int n) const -> message_type {
-    message_type::shape_type shape = Shape(n);
-    message_type msg(shape);
-
-    using BidirIt = typename std::vector<int>::iterator;
-
-    std::vector<int> coords(child_ploidy_+parents_ploidy_, 0);
-
-    std::vector<std::pair<BidirIt,BidirIt>> partitions;
-    int pos = parents_ploidy_+child_ploidy_;
-    for(auto it = ploidies_.rbegin(); it != ploidies_.rend(); ++it) {
-        pos -= *it;
-        partitions.emplace_back(coords.begin()+pos, coords.begin()+pos+*it);
-    }
-
-    auto do_permute = [&](auto &val) {
-        return std::next_permutation(val.first, val.second);
-    };
-    auto do_next_multiset = [&](auto &val) {
-        return next_multiset(val.first, val.second, n);
-    };
-
-    message_type::size_type idx = 0;
-    do {
-        auto total = mutation_type::Zero();
-        int counter = 0;
-        do {
-            do {
-                auto temp = mutation_type::One();
-                for(int x = 0; x < child_ploidy_; ++x) {
-                    auto value = mutation_type::Zero();
-                    for(auto &&par : transitions_[x]) {
-                        value = mutation_type::Plus(value, par.mu(coords[x+parents_ploidy_],
-                            coords[par.parent], par.weight));
-                    }
-                    temp = mutation_type::Times(temp, value);
-                }
-                total = mutation_type::Plus(total, temp);
-            } while(do_permute(partitions[0]));
-            counter += 1;
-        } while(std::any_of(std::next(partitions.begin()), partitions.end(), do_permute));
-
-        msg.flat(idx++) = total / counter;
-    } while(std::any_of(partitions.begin(), partitions.end(), do_next_multiset));
-
-    return msg;
-}
-
-template<class T>
-auto MutationBuilder<T>::Shape(int n) const -> message_type::shape_type {
-    message_type::shape_type ret;
-    for(auto v : ploidies_) {
-        if(v > 0) {
-            ret.push_back(boost::math::binomial_coefficient<double>(n+v-1, v));
-        }
-    }
-    return ret;
-}
-
-TEST_CASE("MutationBuilder") {
-    using Builder = MutationBuilder<MutationSemiring>;
+TEST_CASE("MutationMessageBuilder") {
+    using Semiring = mutk::mutation_semiring::Probability;
+    using Builder = mutk::MutationMessageBuilder<Semiring>;
 
     using S = mutk::message_t::shape_type; S{};
 
     {
         Builder builder({2,2});
 
-        builder.AddTransition(0, 0, 1.0, MutationSemiring(4,0.001));
-        builder.AddTransition(1, 1, 1.0, MutationSemiring(4,0.001));
+        builder.AddTransition(0, 0, 1.0, Semiring(4,0.001));
+        builder.AddTransition(1, 1, 1.0, Semiring(4,0.001));
 
         auto msg = builder.Create(4);
 
@@ -244,9 +89,9 @@ TEST_CASE("MutationBuilder") {
     {
         Builder builder({2,1,2});
 
-        builder.AddTransition(0, 0, 0.5, MutationSemiring(4,0.0001));
-        builder.AddTransition(0, 1, 0.5, MutationSemiring(4,0.0001));
-        builder.AddTransition(1, 2, 1.0, MutationSemiring(4,0.001));
+        builder.AddTransition(0, 0, 0.5, Semiring(4,0.0001));
+        builder.AddTransition(0, 1, 0.5, Semiring(4,0.0001));
+        builder.AddTransition(1, 2, 1.0, Semiring(4,0.001));
 
         auto msg = builder.Create(2);
 

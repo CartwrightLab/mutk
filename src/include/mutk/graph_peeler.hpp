@@ -38,6 +38,11 @@ struct workspace_t {
     std::vector<mutk::message_t> messages;
 };
 
+
+/*
+GraphPeeler is relationship-graph peeling algorithm using a
+Shenoy-Shafer architecture.
+*/
 class GraphPeeler {
 public:
     GraphPeeler() = default;
